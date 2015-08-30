@@ -565,21 +565,35 @@ def Parse(s):
         break
     return expr
 
+  def TemporaryVariableName():
+    TemporaryVariableName.counter += 1
+    return '__tmp%d' % TemporaryVariableName.counter
+
+  TemporaryVariableName.counter = 0
+
+  def TransformAssign(target, value):
+    if target['type'] == 'LookupVariable':
+      return {'type': 'Assign', 'target': target['name'], 'value': value}
+    elif target['type'] == 'Call' and target['function'] == {'type': 'LookupVariable', 'name': 'GetAttribute'}:
+      owner, attrexpr = target['arguments']
+      return {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'SetAttribute'}, 'arguments': [owner, attrexpr, value]}
+    elif target['type'] == 'Call' and target['function'] == {'type': 'LookupVariable', 'name': 'GetItem'}:
+      owner, index = target['arguments']
+      return {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'SetItem'}, 'arguments': [owner, index, value]}
+    elif target['type'] == 'List':
+      valuevar = TemporaryVariableName()
+      exprs = [{'type': 'Assign', 'target': valuevar, 'value': value}]
+      for i, item in enumerate(target['value']):
+        exprs.append(TransformAssign(item, {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetItem'}, 'arguments': [{'type': 'LookupVariable', 'name': valuevar}, {'type': 'Number', 'value': i}]}))
+      return {'type': 'Block', 'expressions': exprs}
+    else:
+      raise SyntaxError('%s is not assignable' % target['type'])
+
   def AssignExpression():
     expr = LogicalOrExpression()
     while True:
       if Consume('='):
-        value = AssignExpression()
-        if expr['type'] == 'LookupVariable':
-          expr = {'type': 'Assign', 'target':expr['name'], 'value': value}
-        elif expr['type'] == 'Call' and expr['function'] == {'type': 'LookupVariable', 'name': 'GetAttribute'}:
-          owner, attrexpr = expr['arguments']
-          expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'SetAttribute'}, 'arguments': [owner, attrexpr, value]}
-        elif expr['type'] == 'Call' and expr['function'] == {'type': 'LookupVariable', 'name': 'GetItem'}:
-          owner, index = expr['arguments']
-          expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'SetItem'}, 'arguments': [owner, index, value]}
-        else:
-          raise SyntaxError('%s is not assignable' % expr['type'])
+        expr = TransformAssign(expr, AssignExpression())
       else:
         break
     return expr
