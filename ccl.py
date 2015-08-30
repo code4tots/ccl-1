@@ -66,6 +66,8 @@ function And(cc, aa, bb) {
   })
 }
 
+XXNone = undefined
+
 function XXNot(cc, x) {
   cc(!Truthy(x))
 }
@@ -280,13 +282,19 @@ Map = \ f args
     i = i + 1
   newargs
 
-Reduce = \ f args
-  ret = args[0]
-  i = 1
+FoldLeft = \ f init args
+  i = 0
   while i < Size(args)
-    ret = f(ret, args[i])
+    init = f(init, args[i])
     i = i + 1
-  ret
+  init
+
+# Fold implies operation is associative and potentially allows for parallel computing.
+
+Fold = FoldLeft
+
+Reduce = \ f args
+  Fold(f, args[0], Slice(args, 1, None))
 
 """
 
