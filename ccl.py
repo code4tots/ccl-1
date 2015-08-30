@@ -454,9 +454,77 @@ def Parse(s):
     GetAttribute(Object, String)
     SetAttribute(Object, String, Object)
 
+
+  Builtins
+
+    # Named constants
+    None
+    True
+    False
+
+    # Type conversions
+    Type(Object)
+    Bool(Object)
+    Int(Bool|Int|Float|String)
+    Float(Bool|Int|Float|String)
+    String(Object)
+    List(Iterable)
+    Set(Iterable)
+    Dict(Iterable)
+    Iterator(Iterable)
+
+    # Functional utils
+    Reduce(Function, Iterable)
+    Fold(Function, Object, Iterable)
+    FoldLeft(Function, Object, Iterable)
+    FoldRight(Function, Object, Iterable)
+    Map(Function, Iterable)
+    Filter(Function, Iterable)
+
+    # Arithmetic functions
+    Add(Number, Number)
+    Add(String, String)
+    Add(List, List)
+    Subtract(Number, Number)
+    Multiply(Number, Number)
+    Multiply(List, Int)
+    Divide(Number, Number)
+    Mod(Number, Number)
+    Mod(String, List)
+
+    # Container utils
+    GetItem(List, Int)
+    SetItem(List, Int, Object)
+    Slice(List|String, Int|None, Int|None, Int|None)
+    Push(List, Object)
+    Push(String, String)
+    Pop(List)
+    Pop(String)
+
+    # Logical operations
     Not(Object)
     Equal(Object, Object)
     LessThan(Object, Object)
+
+    # String utils
+    Split(String)
+    SplitLines(String)
+
+    # Iterable utils
+    Done(Iterator)
+    Next(Iterator)
+
+    ## IO
+
+    Stdin : File
+    Stdout : File
+    Read(File) : String
+    Read(String) : String
+    Read() : String
+    Prints(List) : List
+    Prints(File, List): List
+    Print(Object) : Object
+    Print(File, Object): Object
 
   """
   toks = Lex(s)
