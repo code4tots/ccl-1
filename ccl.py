@@ -123,6 +123,10 @@ function XXRepr(cc, x) {
   throw "Tried to Repr " + TypeOf(x)
 }
 
+function XXBool(cc, x) {
+  cc(Truthy(x))
+}
+
 function XXInt(cc, x) {
   switch(TypeOf(x)) {
   case "none": cc(0); return
