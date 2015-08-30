@@ -1,3 +1,2 @@
 #!/bin/bash
-cat > tmp.dat
-cat $1 | python3 ccl.py > tmp.js && cat tmp.dat | node tmp.js && rm tmp.js tmp.dat
+cat "$1" | python3 ccl.py > tmp.js && node tmp.js && rm tmp.js
