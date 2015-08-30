@@ -158,6 +158,13 @@ function XXString(cc, x) {
   throw "Tried to String " + TypeOf(x)
 }
 
+function XXRead(cc) {
+  var content = ''
+  process.stdin.setEncoding('utf8')
+  process.stdin.on('readable', function() { var val = process.stdin.read(); if (val) { content += val; } })
+  process.stdin.on('end', function() { cc(content) })
+}
+
 function XXPrint(cc, x) {
   var args = [], outerargs = arguments
   function loop(i) {
@@ -217,6 +224,38 @@ function XXSetItem(cc, xs, i, value) {
 function XXPush(cc, xs, x) {
   xs.push(x)
   cc()
+}
+
+function XXStrip(cc, str) {
+  switch(TypeOf(str)) {
+  case 'str': cc(str.replace(/^\s+|\s+$/g, '')); return
+  }
+  throw "Tried to Strip " + TypeOf(x)
+}
+
+function XXSlice(cc, args, lower, upper, step) {
+  if (lower === undefined) lower = 0
+  if (upper === undefined) upper = args.length
+  if (step === undefined) step = 1
+
+  lower = (lower + args.length) % args.length
+  upper = (upper + args.length) % args.length
+
+  if (step !== 1)
+    throw "Non-unit step slicing not yet supported: " + step
+
+  if (upper === 0)
+    upper = args.length
+
+  cc(args.slice(lower, upper))
+}
+
+function XXSplit(cc, s) {
+  cc(s.split(/\s+/).filter(function(x) { return x !== '' }))
+}
+
+function XXSplitLines(cc, s) {
+  cc(s.split(/\n+/).filter(function(x) { return x !== '' }))
 }
 
 """
