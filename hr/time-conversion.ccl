@@ -1,0 +1,19 @@
+input = Strip(Read())
+
+hour = Int(input[:2])
+rest = input[2:Size('xx:xx:xx')]
+suffix = input[-2:]
+
+if hour == 12 and suffix == 'AM'
+	hour = 0
+else if hour == 12 and suffix == 'PM'
+	hour = 12
+else if suffix == 'PM'
+	hour = hour + 12
+
+if hour < 10
+	hour = '0' + String(hour)
+else
+	hour = String(hour)
+
+Print(hour + rest)

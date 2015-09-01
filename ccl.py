@@ -10,7 +10,7 @@ import sys
 SYMBOLS = (
     '\\','.',
     ':',
-    '+',
+    '+', '-',
     '(', ')', '[', ']', ',', '=',
     '==', '<', '>', '<=', '>=', '!=',
 )
@@ -179,11 +179,22 @@ function XXPrint(cc, x) {
   loop(1)
 }
 
+function XXNegate(cc, x) {
+  switch(TypeOf(x)) {
+  case 'num': cc(-x); return
+  }
+  throw "Tried to Negate " + TypeOf(x)
+}
+
 function XXAdd(cc, a, b) {
   switch(TypeOf(a)) {
   case "num":
     switch(TypeOf(b)) {
     case "num": cc(a + b); return
+    }
+  case "str":
+    switch(TypeOf(b)) {
+    case "str": cc(a + b); return
     }
   }
   throw "Tried to Add " + TypeOf(a) + " and " + TypeOf(b)
@@ -211,6 +222,7 @@ function XXMultiply(cc, a, b) {
 
 function XXSize(cc, xs) {
   switch(TypeOf(xs)) {
+  case 'str': cc(xs.length); return
   case 'list': cc(xs.length); return
   }
   throw "Tried to Size " + TypeOf(xs)
@@ -285,6 +297,10 @@ function XXSplitLines(cc, s) {
 
 PRELUDE = r"""
 
+###########
+## Builtins
+###########
+
 LessThanOrEqual = \ left right
   left == right or left < right
 
@@ -315,6 +331,10 @@ Fold = FoldLeft
 
 Reduce = \ f args
   Fold(f, args[0], Slice(args, 1, None))
+
+###################
+## End of builtins.
+###################
 
 """
 
@@ -509,9 +529,26 @@ def Parse(s):
           Consume(',')
         expr = {'type': 'Call', 'function': expr, 'arguments': args}
       elif Consume('['):
-        index = Expression()
-        Expect(']')
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetItem'}, 'arguments': [expr, index]}
+        index = {'type': 'LookupVariable', 'name': 'None'}
+        if not At(':'):
+          index = Expression()
+
+        if Consume(']'):
+          expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetItem'}, 'arguments': [expr, index]}
+        else:
+          Expect(':')
+
+          upper = {'type': 'LookupVariable', 'name': 'None'}
+          if not At(':') and not At(']'):
+            upper = Expression()
+
+          step = {'type': 'LookupVariable', 'name': 'None'}
+          if Consume(':'):
+            if not At(']'):
+              step = Expression()
+
+          Expect(']')
+          expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Slice'}, 'arguments': [expr, index, upper, step]}
       elif Consume('.'):
         attr = Expect('id').value
         expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetAttribute'}, 'arguments': [expr, {'type': 'String', 'value': attr}]}
@@ -519,11 +556,16 @@ def Parse(s):
         break
     return expr
 
+  def PrefixExpression():
+    if Consume('-'):
+      return {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Negate'}, 'arguments': [PrefixExpression()]}
+    return PostfixExpression()
+
   def AdditiveExpression():
-    expr = PostfixExpression()
+    expr = PrefixExpression()
     while True:
       if Consume('+'):
-        rhs = PostfixExpression()
+        rhs = PrefixExpression()
         expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Add'}, 'arguments': [expr, rhs]}
       else:
         break
