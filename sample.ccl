@@ -23,4 +23,3 @@ Print(a, b)
 
 
 Print(Reduce(Add, [1, 2, 3]))
-
