@@ -21,5 +21,4 @@ Print(a, b)
 [a, b] = [b, a+2]
 Print(a, b)
 
-
 Print(Reduce(Add, [1, 2, 3]))

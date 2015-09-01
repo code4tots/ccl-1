@@ -374,7 +374,6 @@ def Lex(s):
       if word in KEYWORDS:
         tokens.append((word, None))
       else:
-        tokens.append(('id', s[j:i]))
     elif s.startswith(SYMBOLS, i):
       symbol = max(symbol for symbol in SYMBOLS if s.startswith(symbol, i))
       if symbol in ('(', '{', '['):

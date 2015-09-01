@@ -1,0 +1,10 @@
+[[actual_day, actual_month, actual_year], [expected_day, expected_month, expected_year]] = Map(\line . Map(Int, Split(line)), SplitLines(Read()))
+
+if actual_year < expected_year or actual_year == expected_year and actual_month < expected_month or actual_year == expected_year and actual_month == expected_month and actual_day <= expected_day
+	Print(0)
+else if actual_month == expected_month and actual_year == expected_year
+	Print(Multiply(15, Subtract(actual_day, expected_day)))
+else if actual_year == expected_year
+	Print(Multiply(500, Subtract(actual_month, expected_month)))
+else
+	Print(10000)
