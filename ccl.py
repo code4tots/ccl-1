@@ -189,6 +189,26 @@ function XXAdd(cc, a, b) {
   throw "Tried to Add " + TypeOf(a) + " and " + TypeOf(b)
 }
 
+function XXSubtract(cc, a, b) {
+  switch(TypeOf(a)) {
+  case "num":
+    switch(TypeOf(b)) {
+    case "num": cc(a - b); return
+    }
+  }
+  throw "Tried to Subtract " + TypeOf(a) + " and " + TypeOf(b)
+}
+
+function XXMultiply(cc, a, b) {
+  switch(TypeOf(a)) {
+  case "num":
+    switch(TypeOf(b)) {
+    case "num": cc(a * b); return
+    }
+  }
+  throw "Tried to Multiply " + TypeOf(a) + " and " + TypeOf(b)
+}
+
 function XXSize(cc, xs) {
   switch(TypeOf(xs)) {
   case 'list': cc(xs.length); return
@@ -338,10 +358,12 @@ def Lex(s):
           pass
         elif indent.startswith(indent_stack[-1]):
           tokens.append(('indent', None))
+          tokens.append(('newline', None))
           indent_stack.append(indent)
         elif indent in indent_stack:
           while indent != indent_stack[-1]:
             tokens.append(('dedent', None))
+            tokens.append(('newline', None))
             indent_stack.pop()
         else:
           raise SyntaxError('Invalid indent: ' + repr(indent))
@@ -374,6 +396,7 @@ def Lex(s):
       if word in KEYWORDS:
         tokens.append((word, None))
       else:
+        tokens.append(('id', word))
     elif s.startswith(SYMBOLS, i):
       symbol = max(symbol for symbol in SYMBOLS if s.startswith(symbol, i))
       if symbol in ('(', '{', '['):
