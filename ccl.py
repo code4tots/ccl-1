@@ -35,13 +35,25 @@ function Step(state) {
   case 'LookupVariable': state.stack.push(state.scope[bytecode.name]); break
   case 'Number': state.stack.push({type: 'Number', value: bytecode.value}); break
   case 'String': state.stack.push({type: 'String', value: bytecode.value}); break
-  case 'PushStack': break
-  case 'PopStack': break
-  case 'StartList': break
-  case 'EndList': break
-  case 'StartFunction': break
-  case 'Return': break
-  case 'DeclareVariable': break
+  case 'PushStack': state.stackstack.push(state.stack); state.stack = []; break
+  case 'PopStack': state.stack = state.stackstack.pop(); break
+  case 'StartList': state.stackstack.push(state.stack); state.stack = []; break
+  case 'EndList': var list = state.stack; state.stack = state.stackstack.pop(); state.stack.push(list); break
+  case 'StartFunction':
+    state.stackstack.push(state.stack); state.stack = []; // push stack
+    state.scopestack.push(state.scope); state.scope = Object.create(state.scope); // push scope
+    for (var i = 0; i < state.arguments.length; i++)
+      scope[bytecode.arguments[i]] = state.arguments[i]
+    break
+  case 'Return':
+    var ret = state.stack.pop()
+    state.stack = state.stackstack.pop()
+    state.stack.push(ret)
+    state.programCounter = state.callstack.pop()
+    break
+  case 'DeclareVariable':
+
+    break
   case 'JumpIf': break
   case 'Function': break
   case 'Apply': break
@@ -70,6 +82,8 @@ function NewState(bytecodes) {
     scope: {},
     stackstack: [],
     scopestack: [],
+    arguments: undefined,
+    callstack = [],
 
     labeltable: labeltable,
     programCounter: 0,

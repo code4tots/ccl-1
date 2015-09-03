@@ -83,7 +83,12 @@ Number
 String
   value: string
 
+List
+  value: [Value]
 
+Function
+  id: index
+  
 
 ## Builtins
 
