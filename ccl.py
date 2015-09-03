@@ -1,9 +1,4 @@
 """ccl.py
-
-Right now there is probably an issue with not having TCO.
-I'm thinking maybe I could use setTimeout to limit the callstack.
-But I'll worry about that later if the growing callstack really becomes a problem.
-
 """
 import sys
 
@@ -20,279 +15,6 @@ KEYWORDS = (
     'if', 'else',
     'and', 'or',
 )
-
-NATIVE_PRELUDE = r"""
-
-function TypeOf(x) {
-  var to = typeof x
-  switch(to) {
-  case "undefined": return "none"
-  case "boolean": return "bool"
-  case "number": return "num"
-  case "string": return "str"
-  case "object":
-    if (Array.isArray(x))
-      return "list"
-    if (x.constructor === Map)
-      return "dict"
-    throw x.constructor
-  case "function": return "func"
-  default: throw "Urecognized TypeOf: " + to
-  }
-}
-
-function Truthy(x) {
-  switch(TypeOf(x)) {
-  case "none": return false
-  case "bool": return x
-  case "num": return x !== 0
-  case "str": return x.length > 0
-  case "list": return x.length > 0
-  }
-  throw "Tried to Truthy: " + TypeOf(x)
-}
-
-function Or(cc, aa, bb) {
-  aa(function(a) {
-    if (Truthy(a)) { cc(a); return }
-    bb(function(b) { cc(b) })
-  })
-}
-
-function And(cc, aa, bb) {
-  aa(function(a) {
-    if (!Truthy(a)) { cc(a); return }
-    bb(function(b) { cc(b) })
-  })
-}
-
-XXNone = undefined
-
-function XXNot(cc, x) {
-  cc(!Truthy(x))
-}
-
-function XXEqual(cc, a, b) {
-  switch(TypeOf(a)) {
-  case "none":
-  case "bool":
-  case "num":
-  case "str": cc(a === b); return
-  case "list":
-    if (TypeOf(b) !== "list") { cc(false); return }
-    if (b.length !== a.length) { cc(false); return }
-    function loop(i) {
-      if (i >= a.length) { cc(true); return }
-      XXEqual(function(eq) {
-        if (!eq) { cc(false); return }
-        loop(i+1)
-      }, a[i], b[i])
-    }
-    loop(0)
-    return
-  }
-  throw "Tried to Equal: " + TypeOf(a) + " and " + TypeOf(b)
-}
-
-function XXLessThan(cc, a, b) {
-  switch(TypeOf(a)) {
-  case "bool":
-  case "num":
-  case "str": cc(a < b); return
-  }
-  throw "Tried to LessThan: " + TypeOf(a) + " and " + TypeOf(b)
-}
-
-function XXRepr(cc, x) {
-  switch(TypeOf(x)) {
-  case "num": cc(x.toString()); return
-  case "str": cc('"' + x.replace('\n', '\\n').replace('"', '\\"') + '"'); return
-  case "list":
-    var s = '['
-    function loop(i) {
-      if (i >= x.length) {
-        cc(s+']'); return
-      }
-      XXRepr(function(val) {
-        if (i > 0)
-          s += ', '
-        s += val
-        loop(i+1)
-      }, x[i])
-    }
-    loop(0); return
-  }
-  throw "Tried to Repr " + TypeOf(x)
-}
-
-function XXBool(cc, x) {
-  cc(Truthy(x))
-}
-
-function XXInt(cc, x) {
-  switch(TypeOf(x)) {
-  case "none": cc(0); return
-  case "bool": cc(x ? 1 : 0); return
-  case "num": cc(Math.floor(x)); return
-  case "str": cc(parseInt(x)); return
-  }
-  throw "Tried to Int " + TypeOf(x)
-}
-
-function XXFloat(cc, x) {
-  switch(TypeOf(x)) {
-  case "none": cc(0); return
-  case "bool": cc(x ? 1 : 0); return
-  case "num": cc(x); return
-  case "str": cc(parseFloat(x)); return
-  }
-  throw "Tried to Float " + TypeOf(x)
-}
-
-function XXString(cc, x) {
-  switch(TypeOf(x)) {
-  case "none": cc("None"); return
-  case "bool": cc(x ? "True" : "False"); return
-  case "num": cc(x.toString()); return
-  case "str": cc(x); return
-  case "list": XXRepr(cc, x); return
-  }
-  throw "Tried to String " + TypeOf(x)
-}
-
-function XXRead(cc) {
-  var content = ''
-  process.stdin.setEncoding('utf8')
-  process.stdin.on('readable', function() { var val = process.stdin.read(); if (val) { content += val; } })
-  process.stdin.on('end', function() { cc(content) })
-}
-
-function XXPrint(cc, x) {
-  var args = [], outerargs = arguments
-  function loop(i) {
-    if (i >= outerargs.length) { console.log.apply(null, args); cc(); return }
-    XXString(function(arg) {
-      args.push(arg)
-      loop(i+1)
-    }, outerargs[i])
-  }
-  loop(1)
-}
-
-function XXNegate(cc, x) {
-  switch(TypeOf(x)) {
-  case 'num': cc(-x); return
-  }
-  throw "Tried to Negate " + TypeOf(x)
-}
-
-function XXAdd(cc, a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": cc(a + b); return
-    }
-  case "str":
-    switch(TypeOf(b)) {
-    case "str": cc(a + b); return
-    }
-  }
-  throw "Tried to Add " + TypeOf(a) + " and " + TypeOf(b)
-}
-
-function XXSubtract(cc, a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": cc(a - b); return
-    }
-  }
-  throw "Tried to Subtract " + TypeOf(a) + " and " + TypeOf(b)
-}
-
-function XXMultiply(cc, a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": cc(a * b); return
-    }
-  }
-  throw "Tried to Multiply " + TypeOf(a) + " and " + TypeOf(b)
-}
-
-function XXSize(cc, xs) {
-  switch(TypeOf(xs)) {
-  case 'str': cc(xs.length); return
-  case 'list': cc(xs.length); return
-  }
-  throw "Tried to Size " + TypeOf(xs)
-}
-
-function XXGetItem(cc, xs, i) {
-  switch(TypeOf(xs)) {
-  case 'list':
-    switch(TypeOf(i)) {
-    case 'num':
-      if (i < 0 || i >= xs.length)
-        throw "Tried to GetItem of length " + xs.length + " but index is out of bounds " + i
-      cc(xs[i]); return
-    }
-  }
-  throw "Tried to GetItem " + TypeOf(xs) + " and " + TypeOf(i)
-}
-
-function XXSetItem(cc, xs, i, value) {
-  switch(TypeOf(xs)) {
-  case 'list':
-    switch(TypeOf(i)) {
-    case 'num':
-      if (i < 0 || i >= xs.length)
-        throw "Tried to SetItem of length " + xs.length + " but index is out of bounds " + i
-      xs[i] = value
-      cc(value); return
-    }
-  }
-  throw "Tried to SetItem " + TypeOf(xs) + " and " + TypeOf(i) + " and " + TypeOf(value)
-}
-
-function XXPush(cc, xs, x) {
-  xs.push(x)
-  cc()
-}
-
-function XXStrip(cc, str) {
-  switch(TypeOf(str)) {
-  case 'str': cc(str.replace(/^\s+|\s+$/g, '')); return
-  }
-  throw "Tried to Strip " + TypeOf(x)
-}
-
-function XXSlice(cc, args, lower, upper, step) {
-  if (lower === undefined) lower = 0
-  if (upper === undefined) upper = args.length
-  if (step === undefined) step = 1
-
-  lower = (lower + args.length) % args.length
-  upper = (upper + args.length) % args.length
-
-  if (step !== 1)
-    throw "Non-unit step slicing not yet supported: " + step
-
-  if (upper === 0)
-    upper = args.length
-
-  cc(args.slice(lower, upper))
-}
-
-function XXSplit(cc, s) {
-  cc(s.split(/\s+/).filter(function(x) { return x !== '' }))
-}
-
-function XXSplitLines(cc, s) {
-  cc(s.split(/\n+/).filter(function(x) { return x !== '' }))
-}
-
-"""
 
 
 PRELUDE = r"""
@@ -593,12 +315,15 @@ def Parse(s):
         break
     return expr
 
+  def Suspend(expr):
+    return {'type': 'Function', 'arguments': [], 'body': expr}
+
   def LogicalAndExpression():
     expr = CompareExpression()
     while True:
       if Consume('and'):
         rhs = CompareExpression()
-        expr = {'type': 'And', 'left': expr, 'right': rhs}
+        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'And'}, 'arguments': [expr, Suspend(rhs)]}
       else:
         break
     return expr
@@ -608,7 +333,7 @@ def Parse(s):
     while True:
       if Consume('or'):
         rhs = LogicalAndExpression()
-        expr = {'type': 'Or', 'left': expr, 'right': rhs}
+        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Or'}, 'arguments': [expr, Suspend(rhs)]}
       else:
         break
     return expr
@@ -707,73 +432,135 @@ def AnnotateParseResultsWithVariableDeclarations(node):
   return variables
 
 
-def Translate(source):
-  return '// This is an autogenerated CCL Program. To see the original source, evaluate the following expresison:\n//' + '+'.join('String.fromCharCode(%d)' % ord(c) for c in source) + '\n' + TranslateNode(Parse(source))
+def ModuleToBytecodes(module):
 
-# TranslateNode parsed result into a javascript program in the continuation passing style (cps)
-def TranslateNode(node):
-  if node['type'] == 'Module':
-    decls = ''
-    if node['variables']:
-      decls = 'var ' + ','.join('XX' + v for v in node['variables'])
-    s = 'function(cc){cc()}'
-    for expr in node['expressions']:
-      s = 'function(cc){(%s)(function(){(%s)(cc)})}' % (s, TranslateNode(expr))
-    return NATIVE_PRELUDE + ';%s;(%s)(function(){});\n' % (decls, s)
+  def MakeNewlabel():
+    MakeNewlabel.counter += 1
+    return {'type': 'Label', 'id': MakeNewlabel.counter}
+  MakeNewlabel.counter = 0
 
-  elif node['type'] == 'Block':
-    s = 'function(cc){cc()}'
-    for expr in node['expressions']:
-      s = 'function(cc){(%s)(function(){(%s)(cc)})}' % (s, TranslateNode(expr))
-    return s
+  def NodeToBytecodes(node):
+    if node['type'] == 'Module':
+      bytecodes = [{'type': 'DeclareVariable', 'name': name} for name in node['variables']]
+      for expr in node['expressions']:
+        bytecodes.append({'type': 'PushStack'})
+        bytecodes.extend(NodeToBytecodes(expr))
+        bytecodes.append({'type': 'PopStack'})
+      return bytecodes
 
-  elif node['type'] == 'Or':
-    return 'function(cc){Or(cc,(%s),(%s))}' % tuple(map(TranslateNode, (node['left'], node['right'])))
+    elif node['type'] == 'Block':
+      bytecodes = []
+      if node['expressions']:
+        for expr in node['expressions'][:-1]:
+          bytecodes.append({'type': 'PushStack'})
+          bytecodes.extend(NodeToBytecodes(expr))
+          bytecodes.append({'type': 'PopStack'})
+        bytecodes.extend(NodeToBytecodes(node['expressions'][-1]))
+      return bytecodes
 
-  elif node['type'] == 'And':
-    return 'function(cc){And(cc,(%s),(%s))}' % tuple(map(TranslateNode, (node['left'], node['right'])))
+    elif node['type'] == 'If':
+      before_body = MakeNewlabel()
+      before_else = MakeNewlabel()
+      after_else = MakeNewlabel()
+      bytecodes = NodeToBytecodes(node['test'])
+      bytecodes.append({'type': 'JumpIf', 'id': before_body['id']})
+      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
+      bytecodes.append({'type': 'JumpIf', 'id': before_else['id']})
+      bytecodes.append(before_body)
+      bytecodes.extend(NodeToBytecodes(node['body']))
+      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
+      bytecodes.append({'type': 'JumpIf', 'id': after_else['id']})
+      bytecodes.append(before_else)
+      bytecodes.extend(NodeToBytecodes(node['else']))
+      bytecodes.append(after_else)
+      return bytecodes
 
-  elif node['type'] == 'If':
-    return 'function(cc){(%s)(function(testresult){if(Truthy(testresult)){(%s)(cc)}else{(%s)(cc)}})}' % tuple(map(TranslateNode, (node['test'], node['body'], node['else'])))
+    elif node['type'] == 'While':
+      before_test = MakeNewlabel()
+      before_body = MakeNewlabel()
+      after_body = MakeNewlabel()
+      bytecodes = [before_test]
+      bytecodes.extend(NodeToBytecodes(node['test']))
+      bytecodes.append({'type': 'JumpIf', 'id': before_body['id']})
+      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
+      bytecodes.append({'type': 'JumpIf', 'id': after_body['id']})
+      bytecodes.append(before_body)
+      bytecodes.extend(NodeToBytecodes(node['body']))
+      bytecodes.append(after_body)
+      return bytecodes
 
-  elif node['type'] == 'While':
-    return 'function(cc){ function loop(){ ((%s)( function(testresult){if(Truthy(testresult)){(%s)(loop)}else{cc()}} )) }; loop()}' % tuple(map(TranslateNode, (node['test'], node['body'])))
+    elif node['type'] in ('LookupVariable', 'Number', 'String',):
+      return [node]
 
-  elif node['type'] == 'Call':
-    s = 'f(cc%s)' % ''.join(',arg%d' % n for n in range(len(node['arguments'])))
-    for i, arg in reversed(tuple(enumerate(node['arguments']))):
-      s = '((%s)(function(arg%d){%s}))' % (TranslateNode(arg), i, s)
-    return 'function(cc){(%s)(function (f){%s})}' % (TranslateNode(node['function']), s)
+    elif node['type'] == 'List':
+      bytecodes = [{'type': 'StartList'}]
+      for expr in node['value']:
+        bytecodes.extend(bytecodes)
+      bytecodes.append({'type': 'EndList'})
+      return bytecodes
 
-  elif node['type'] == 'Assign':
-    return 'function(cc){(%s)(function(value){XX%s=value;cc(value)})}' % (TranslateNode(node['value']), node['target'])
+    elif node['type'] == 'Function':
+      before_body = MakeNewlabel()
+      after_body = MakeNewlabel()
+      bytecodes = []
+      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
+      bytecodes.append({'type': 'JumpIf', 'id': after_body['id']})
+      bytecodes.append(before_body)
+      bytecodes.append({'type': 'StartFunction', 'arguments': node['arguments']})
+      bytecodes.extend({'type': 'DeclareVariable', 'name': name} for name in node['variables'])
+      bytecodes.append({'type': 'LookupVariable', 'name': 'None'})
+      bytecodes.extend(NodeToBytecodes(node['body']))
+      bytecodes.append({'type': 'Return'})
+      bytecodes.append(after_body)
+      bytecodes.append({'type': 'Function', 'id': before_body['id']})
+      return bytecodes
 
-  elif node['type'] == 'LookupVariable':
-    return 'function(cc){cc(%s)}' % ('XX' + node['name'])
+    elif node['type'] == 'Call':
+      bytecodes = NodeToBytecodes(node['function'])
+      bytecodes = [{'type': 'StartList'}]
+      for expr in node['arguments']:
+        bytecodes.extend(bytecodes)
+      bytecodes.append({'type': 'EndList'})
+      bytecodes.append({'type': 'Apply'})
+      return bytecodes
 
-  elif node['type'] == 'Number':
-    return 'function(cc){cc(%s)}' % node['value']
+    elif node['type'] == 'Assign':
+      bytecodes = NodeToBytecodes(node['value'])
+      bytecodes.append({'type': 'Assign', 'target': node['target']})
+      return bytecodes
 
-  elif node['type'] == 'String':
-    return 'function(cc){cc(%s)}' % '+'.join('String.fromCharCode(%d)' % ord(c) for c in node['value'])
-
-  elif node['type'] == 'List':
-    s = 'cc([%s])' % ','.join('arg%d' % n for n in range(len(node['value'])))
-    for i, arg in reversed(tuple(enumerate(node['value']))):
-      s = '((%s)(function(arg%d){%s}))' % (TranslateNode(arg), i, s)
-    return 'function(cc){%s}' % s
-
-  elif node['type'] == 'Function':
-    decls = ''
-    if node['variables']:
-      decls = 'var ' + ','.join('XX' + v for v in node['variables'])
-    s = 'function(cc%s){%s;(%s)(cc)}' % (''.join(',XX'+v for v in node['arguments']), decls, TranslateNode(node['body']))
-    return 'function(cc){cc(%s)}' % s
-
-  else:
     raise SyntaxError('Unrecognized type ' + node['type'])
+
+  return NodeToBytecodes(module)
+
+
+def SanitizeStringForJavascript(s):
+  return '+'.join('String.fromCharCode(%d)' % ord(c) for c in s)
+
+
+def BytecodesToJavascript(bytecodes):
+  s = ';bytecodes = ['
+  for i, bytecode in enumerate(bytecodes):
+    if i > 0:
+      s += ','
+    s += '{'
+    type_ = bytecode['type']
+    for j, (key, value) in enumerate(bytecode.items()):
+      if j > 0:
+        s += ','
+      s += repr(key) + ':'
+      if type_ == 'String' and key == 'value':
+        s += SanitizeStringForJavascript(value)
+      else:
+        s += repr(value)
+    s += '}'
+  s += '];\n'
+  return s
+
+
+def Translate(source):
+  return BytecodesToJavascript(ModuleToBytecodes(Parse(source)))
 
 
 if __name__ == '__main__':
   sys.stdout.write(Translate(PRELUDE + sys.stdin.read()))
-
