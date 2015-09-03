@@ -129,3 +129,22 @@ Prints(List) : List
 Prints(File, List): List
 Print(Object) : Object
 Print(File, Object): Object
+
+## Recursion depth.
+
+Kyumins-iMac:ccl math4tots$ printf "1001 %.0s" {1..1001} | node x.js 
+/Users/math4tots/src/ccl/x.js:0
+(function (exports, require, module, __filename, __dirname) { // This is an au
+
+RangeError: Maximum call stack size exceeded
+    at TypeOf (/Users/math4tots/src/ccl/x.js)
+    at XXAdd (/Users/math4tots/src/ccl/x.js:169:10)
+    at /Users/math4tots/src/ccl/x.js:274:3055
+    at /Users/math4tots/src/ccl/x.js:274:3032
+    at /Users/math4tots/src/ccl/x.js:274:3039
+    at /Users/math4tots/src/ccl/x.js:274:2992
+    at /Users/math4tots/src/ccl/x.js:274:3001
+    at /Users/math4tots/src/ccl/x.js:274:2952
+    at XXi (/Users/math4tots/src/ccl/x.js:274:2963)
+    at /Users/math4tots/src/ccl/x.js:274:3080
+
