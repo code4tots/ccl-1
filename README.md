@@ -75,6 +75,16 @@ Function: pushes 1 value
 Apply: expects 2 values and pushes 1 value
 Assign: expects 1 value and pushes 1 value
 
+## CCL types
+
+Number
+  value: number
+
+String
+  value: string
+
+
+
 ## Builtins
 
 At the moment, I don't have multimethods implemented, so it would be quite a hassle to implement all of these methods.

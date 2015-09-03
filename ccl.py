@@ -17,11 +17,89 @@ KEYWORDS = (
 )
 
 
+NATIVE_PRELUDE = r"""
+
+function Run(state) {
+  state.pause = false
+  while (!state.pause && state.programCounter < state.bytecodes.length)
+    Step(state)
+  console.log(state.pause, state.programCounter, state.bytecodes.length)
+}
+
+function Step(state) {
+  var bytecode = Fetch(state)
+  console.log(bytecode)
+
+  switch(bytecode.type) {
+  case 'Label': break
+  case 'LookupVariable': state.stack.push(state.scope[bytecode.name]); break
+  case 'Number': state.stack.push({type: 'Number', value: bytecode.value}); break
+  case 'String': state.stack.push({type: 'String', value: bytecode.value}); break
+  case 'PushStack': break
+  case 'PopStack': break
+  case 'StartList': break
+  case 'EndList': break
+  case 'StartFunction': break
+  case 'Return': break
+  case 'DeclareVariable': break
+  case 'JumpIf': break
+  case 'Function': break
+  case 'Apply': break
+  case 'Assign': break
+  default: throw 'Unrecognized bytecode type ' + bytecode.type
+  }
+}
+
+function Fetch(state) {
+  return state.bytecodes[state.programCounter++]
+}
+
+function NewState(bytecodes) {
+
+  var labeltable = {}
+
+  for (var i = 0; i < bytecodes.length; i++)
+    if (bytecodes[i].type === 'Label')
+      labeltable[bytecodes[i].id] = i
+
+  return {
+
+    pause: false,
+
+    stack: [],
+    scope: {},
+    stackstack: [],
+    scopestack: [],
+
+    labeltable: labeltable,
+    programCounter: 0,
+    bytecodes: bytecodes
+  }
+}
+
+;"""
+
+
+NATIVE_EPILOGUE = ";Run(NewState(bytecodes))"
+
+
 PRELUDE = r"""
 
 ###########
 ## Builtins
 ###########
+
+Or = \ left rightthunk
+  if left
+    left
+  else
+    rightthunk()
+
+And = \ left rightthunk
+  if Not(left)
+    left
+  else
+    rightthunk()
 
 LessThanOrEqual = \ left right
   left == right or left < right
@@ -539,7 +617,7 @@ def SanitizeStringForJavascript(s):
 
 
 def BytecodesToJavascript(bytecodes):
-  s = ';bytecodes = ['
+  s = NATIVE_PRELUDE + ';var bytecodes = ['
   for i, bytecode in enumerate(bytecodes):
     if i > 0:
       s += ','
@@ -554,7 +632,7 @@ def BytecodesToJavascript(bytecodes):
       else:
         s += repr(value)
     s += '}'
-  s += '];\n'
+  s += ']' + NATIVE_EPILOGUE + '\n'
   return s
 
 
