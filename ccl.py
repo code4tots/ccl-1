@@ -415,6 +415,12 @@ def Parse(s):
     while Consume('newline') or Consume(';'):
       pass
 
+  def Name(name):
+    return {'type': 'LookupVariable', 'name': name}
+
+  def Call(f, args):
+    return {'type': 'Call', 'function': f, 'arguments': args}
+
   def Expression():
     return AssignExpression()
 
@@ -442,7 +448,7 @@ def Parse(s):
       EatExpressionDelimiters()
       body = Expression()
       EatExpressionDelimiters()
-      else_ = {'type': 'LookupVariable', 'name': 'None'}
+      else_ = Name('None')
       if Consume('else'):
         EatExpressionDelimiters()
         else_ = Expression()
@@ -453,7 +459,7 @@ def Parse(s):
       body = Expression()
       return {'type': 'While', 'test': test, 'body': body}
     elif At('id'):
-      return {'type': 'LookupVariable', 'name': GetToken()[1]}
+      return Name(GetToken()[1])
     elif At('num'):
       return {'type': 'Number', 'value': GetToken()[1]}
     elif At('str'):
@@ -477,38 +483,38 @@ def Parse(s):
         while not Consume(')'):
           args.append(Expression())
           Consume(',')
-        expr = {'type': 'Call', 'function': expr, 'arguments': args}
+        expr = Call(expr, args)
       elif Consume('['):
-        index = {'type': 'LookupVariable', 'name': 'None'}
+        index = Name('None')
         if not At(':'):
           index = Expression()
 
         if Consume(']'):
-          expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetItem'}, 'arguments': [expr, index]}
+          expr = Call(Name('GetItem'), [expr, index])
         else:
           Expect(':')
 
-          upper = {'type': 'LookupVariable', 'name': 'None'}
+          upper = Name('None')
           if not At(':') and not At(']'):
             upper = Expression()
 
-          step = {'type': 'LookupVariable', 'name': 'None'}
+          step = Name('None')
           if Consume(':'):
             if not At(']'):
               step = Expression()
 
           Expect(']')
-          expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Slice'}, 'arguments': [expr, index, upper, step]}
+          expr = Call(Name('Slice'), [expr, index, upper, step])
       elif Consume('.'):
         attr = Expect('id').value
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetAttribute'}, 'arguments': [expr, {'type': 'String', 'value': attr}]}
+        expr = Call(Name('GetAttribute'), [expr, {'type': 'String', 'value': attr}])
       else:
         break
     return expr
 
   def PrefixExpression():
     if Consume('-'):
-      return {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Negate'}, 'arguments': [PrefixExpression()]}
+      return Call(Name('Negate'), [PrefixExpression()])
     return PostfixExpression()
 
   def AdditiveExpression():
@@ -516,7 +522,7 @@ def Parse(s):
     while True:
       if Consume('+'):
         rhs = PrefixExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Add'}, 'arguments': [expr, rhs]}
+        expr = Call(Name('Add'), [expr, rhs])
       else:
         break
     return expr
@@ -526,19 +532,19 @@ def Parse(s):
     while True:
       if Consume('=='):
         rhs = AdditiveExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Equal'}, 'arguments': [expr, rhs]}
+        expr = Call(Name('Equal'), [expr, rhs])
       if Consume('<'):
         rhs = AdditiveExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'LessThan'}, 'arguments': [expr, rhs]}
+        expr = Call(Name('LessThan'), [expr, rhs])
       if Consume('<='):
         rhs = AdditiveExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'LessThanOrEqual'}, 'arguments': [expr, rhs]}
+        expr = Call(Name('LessThanOrEqual'), [expr, rhs])
       if Consume('>'):
         rhs = AdditiveExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GreaterThan'}, 'arguments': [expr, rhs]}
+        expr = Call(Name('GreaterThan'), [expr, rhs])
       if Consume('>='):
         rhs = AdditiveExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GreaterThanOrEqual'}, 'arguments': [expr, rhs]}
+        expr = Call(Name('GreaterThanOrEqual'), [expr, rhs])
       else:
         break
     return expr
@@ -551,7 +557,7 @@ def Parse(s):
     while True:
       if Consume('and'):
         rhs = CompareExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'And'}, 'arguments': [expr, Suspend(rhs)]}
+        expr = Call(Name('And'), [expr, Suspend(rhs)])
       else:
         break
     return expr
@@ -561,7 +567,7 @@ def Parse(s):
     while True:
       if Consume('or'):
         rhs = LogicalAndExpression()
-        expr = {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'Or'}, 'arguments': [expr, Suspend(rhs)]}
+        expr = Call(Name('Or'), [expr, Suspend(rhs)])
       else:
         break
     return expr
@@ -575,17 +581,17 @@ def Parse(s):
   def TransformAssign(target, value):
     if target['type'] == 'LookupVariable':
       return {'type': 'Assign', 'target': target['name'], 'value': value}
-    elif target['type'] == 'Call' and target['function'] == {'type': 'LookupVariable', 'name': 'GetAttribute'}:
+    elif target['type'] == 'Call' and target['function'] == Name('GetAttribute'):
       owner, attrexpr = target['arguments']
-      return {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'SetAttribute'}, 'arguments': [owner, attrexpr, value]}
-    elif target['type'] == 'Call' and target['function'] == {'type': 'LookupVariable', 'name': 'GetItem'}:
+      return Call(Name('SetAttribute'), [owner, attrexpr, value])
+    elif target['type'] == 'Call' and target['function'] == Name('GetItem'):
       owner, index = target['arguments']
-      return {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'SetItem'}, 'arguments': [owner, index, value]}
+      return Call(Name('SetItem'), [owner, index, value])
     elif target['type'] == 'List':
       valuevar = TemporaryVariableName()
       exprs = [{'type': 'Assign', 'target': valuevar, 'value': value}]
       for i, item in enumerate(target['value']):
-        exprs.append(TransformAssign(item, {'type': 'Call', 'function': {'type': 'LookupVariable', 'name': 'GetItem'}, 'arguments': [{'type': 'LookupVariable', 'name': valuevar}, {'type': 'Number', 'value': i}]}))
+        exprs.append(TransformAssign(item, Call(Name('GetItem'), [Name(valuevar), {'type': 'Number', 'value': i}])))
       return {'type': 'Block', 'expressions': exprs}
     else:
       raise SyntaxError('%s is not assignable' % target['type'])
