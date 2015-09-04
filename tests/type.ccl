@@ -1,1 +1,1 @@
-Print(Type(4))
+Assert(Type(5) is Float, "Type(5) is not Float?")

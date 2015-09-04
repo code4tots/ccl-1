@@ -12,6 +12,7 @@ SYMBOLS = (
 )
 
 KEYWORDS = (
+    'is',
     'while',
     'if', 'else',
     'and', 'or',
@@ -47,6 +48,8 @@ function Truthy(x) {
   }
   throw "Tried to Truthy: " + TypeOf(x)
 }
+function XXIs(a, b) { return a === b }
+function XXAssert(x, message) { if (!Truthy(x)) throw message }
 function XXType(x) {
   switch(TypeOf(x)) {
   case "none": return XXNone
@@ -579,19 +582,22 @@ def Parse(s):
   def CompareExpression():
     expr = AdditiveExpression()
     while True:
-      if Consume('=='):
+      if Consume('is'):
+        rhs = AdditiveExpression()
+        expr = Call(Name('Is'), [expr, rhs])
+      elif Consume('=='):
         rhs = AdditiveExpression()
         expr = Call(Name('Equal'), [expr, rhs])
-      if Consume('<'):
+      elif Consume('<'):
         rhs = AdditiveExpression()
         expr = Call(Name('LessThan'), [expr, rhs])
-      if Consume('<='):
+      elif Consume('<='):
         rhs = AdditiveExpression()
         expr = Call(Name('LessThanOrEqual'), [expr, rhs])
-      if Consume('>'):
+      elif Consume('>'):
         rhs = AdditiveExpression()
         expr = Call(Name('GreaterThan'), [expr, rhs])
-      if Consume('>='):
+      elif Consume('>='):
         rhs = AdditiveExpression()
         expr = Call(Name('GreaterThanOrEqual'), [expr, rhs])
       else:
