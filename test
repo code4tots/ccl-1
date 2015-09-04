@@ -1,0 +1,4 @@
+#!/bin/bash
+for test in ./tests/*; do
+	echo "Testing $test" && ./ccl "$test" && echo "OK"
+done
