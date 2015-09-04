@@ -47,6 +47,16 @@ function Truthy(x) {
   }
   throw "Tried to Truthy: " + TypeOf(x)
 }
+function XXType(x) {
+  switch(TypeOf(x)) {
+  case "none": return XXNone
+  case "bool": return XXBool
+  case "num": return XXFloat
+  case "str": return XXString
+  case "list": return XXList
+  }
+  throw "Tried to get Type of: " + TypeOf(x)
+}
 var XXNone = undefined
 function XXError(message) { throw message }
 function XXNot(x) { return !Truthy(x) }
@@ -75,6 +85,11 @@ function XXLessThan(a, b) {
   throw "Tried to LessThan: " + TypeOf(a) + " and " + TypeOf(b)
 }
 function XXRepr(x) {
+  switch(x) {
+  case XXInt: return "Int"
+  case XXFloat: return "Float"
+  case XXString: return "String"
+  }
   switch(TypeOf(x)) {
   case "num": return x.toString()
   case "str": return '"' + x.replace('\n', '\\n').replace('"', '\\"') + '"'
@@ -117,7 +132,7 @@ function XXString(x) {
   case "bool": return x ? "True" : "False"
   case "num": return x.toString()
   case "str": return x
-  case "list": return XXRepr(x)
+  default: return XXRepr(x)
   }
   throw "Tried to String " + TypeOf(x)
 }
