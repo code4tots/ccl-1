@@ -505,6 +505,8 @@ def Parse(s):
         while not Consume(')'):
           args.append(Expression())
           Consume(',')
+        if At('\\'):
+          args.append(PrimaryExpression())
         expr = Call(expr, args)
       elif Consume('['):
         index = Name('None')
