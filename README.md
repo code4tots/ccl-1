@@ -42,46 +42,6 @@ Assign: Expression
   target: str
   value: Expression
 
-## Bytecodes
-
-Label
-  id: int
-LookupVariable: pushes 1 value
-  name: str
-Number: pushes 1 value
-  value: int|float
-String: pushes 1 value
-  value: str
-PushStack
-PopStack (Must be matched with a PushStack)
-StartList
-EndList (Must be matched with a StartList): pushes 1 value
-StartFunction
-  arguments: [str]
-Return (Must be matched with a StartFunction): expects 1 value
-DeclareVariable
-  name: str
-JumpIf: expects 1 value
-Function: pushes 1 value
-  id: str
-Apply: expects 2 values and pushes 1 value
-Assign: expects 1 value and pushes 1 value
-
-## CCL types
-
-Number
-  value: number
-
-String
-  value: string
-
-List
-  value: [Value]
-
-Function
-  id: index
-
-
 ## Builtins
 
 At the moment, I don't have multimethods implemented, so it would be quite a hassle to implement all of these methods.
