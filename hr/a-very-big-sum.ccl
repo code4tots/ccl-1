@@ -1,0 +1,1 @@
+Print(Reduce(Add, Map(Int, Split(Read())[1:])))

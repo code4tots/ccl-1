@@ -47,6 +47,7 @@ function Truthy(x) {
   throw "Tried to Truthy: " + TypeOf(x)
 }
 var XXNone = undefined
+function XXError(message) { throw message }
 function XXNot(x) { return !Truthy(x) }
 function XXEqual(a, b) {
   switch(TypeOf(a)) {
@@ -276,7 +277,9 @@ FoldLeft = \ f init args
 Fold = FoldLeft
 
 Reduce = \ f args
-  Fold(f, args[0], Slice(args, 1, None))
+  if Size(args) < 1
+    Error("Reduce's second argument must be a non-empty list, but found an empty one")
+  Fold(f, args[0], args[1:])
 
 ###################
 ## End of builtins.
