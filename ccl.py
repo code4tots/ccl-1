@@ -229,12 +229,12 @@ function XXSlice(args, lower, upper, step) {
   if (lower === undefined) lower = 0
   if (upper === undefined) upper = args.length
   if (step === undefined) step = 1
-  lower = (lower + args.length) % args.length
-  upper = (upper + args.length) % args.length
+  if (lower < 0)
+    lower += args.length
+  if (upper <= 0)
+    upper += args.length
   if (step !== 1)
     throw "Non-unit step slicing not yet supported: " + step
-  if (upper === 0)
-    upper = args.length
   return args.slice(lower, upper)
 }
 function XXSplit(s) {
@@ -691,7 +691,11 @@ def AnnotateParseResultsWithVariableDeclarations(node):
     variables.add(node['target'])
     variables |= AnnotateParseResultsWithVariableDeclarations(node['value'])
 
-  elif node['type'] in ('String', 'Number', 'List', 'LookupVariable'):
+  elif node['type'] == 'List':
+    for expr in node['value']:
+      variables |= AnnotateParseResultsWithVariableDeclarations(expr)
+
+  elif node['type'] in ('String', 'Number', 'LookupVariable'):
     pass
 
   else:
