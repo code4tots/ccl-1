@@ -8,6 +8,7 @@ SYMBOLS = (
     '+', '-',
     '(', ')', '[', ']', ',', '=',
     '==', '<', '>', '<=', '>=', '!=',
+    ';',
 )
 
 KEYWORDS = (
@@ -411,7 +412,7 @@ def Parse(s):
     return GetToken()
 
   def EatExpressionDelimiters():
-    while Consume('newline'):
+    while Consume('newline') or Consume(';'):
       pass
 
   def Expression():
