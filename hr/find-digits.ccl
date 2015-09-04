@@ -1,0 +1,2 @@
+For(Map(Int, Split(Read()))[1:]) \ N
+	Print(Reduce(Add, Map(\digit. if N % Int(digit) == 0; 1 else 0, String(N))))
