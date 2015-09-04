@@ -42,14 +42,6 @@ Assign: Expression
   target: str
   value: Expression
 
-And: Expression
-  left: Expression
-  right: Expression
-
-Or: Expression
-  left: Expression
-  right: Expression
-
 ## Bytecodes
 
 Label
@@ -88,7 +80,7 @@ List
 
 Function
   id: index
-  
+
 
 ## Builtins
 
@@ -146,6 +138,8 @@ Pop(List)
 Pop(String)
 
 ### Logical operations
+Or(Object, Function)
+And(Object, Function)
 Not(Object)
 Equal(Object, Object)
 LessThan(Object, Object)

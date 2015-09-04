@@ -17,84 +17,216 @@ KEYWORDS = (
 )
 
 
-NATIVE_PRELUDE = r"""
+NATIVE_PRELUDE = r"""'use strict';
 
-function Run(state) {
-  state.pause = false
-  while (!state.pause && state.programCounter < state.bytecodes.length)
-    Step(state)
-  console.log(state.pause, state.programCounter, state.bytecodes.length)
-}
-
-function Step(state) {
-  var bytecode = Fetch(state)
-  console.log(bytecode)
-
-  switch(bytecode.type) {
-  case 'Label': break
-  case 'LookupVariable': state.stack.push(state.scope[bytecode.name]); break
-  case 'Number': state.stack.push({type: 'Number', value: bytecode.value}); break
-  case 'String': state.stack.push({type: 'String', value: bytecode.value}); break
-  case 'PushStack': state.stackstack.push(state.stack); state.stack = []; break
-  case 'PopStack': state.stack = state.stackstack.pop(); break
-  case 'StartList': state.stackstack.push(state.stack); state.stack = []; break
-  case 'EndList': var list = state.stack; state.stack = state.stackstack.pop(); state.stack.push(list); break
-  case 'StartFunction':
-    state.stackstack.push(state.stack); state.stack = []; // push stack
-    state.scopestack.push(state.scope); state.scope = Object.create(state.scope); // push scope
-    for (var i = 0; i < state.arguments.length; i++)
-      scope[bytecode.arguments[i]] = state.arguments[i]
-    break
-  case 'Return':
-    var ret = state.stack.pop()
-    state.stack = state.stackstack.pop()
-    state.stack.push(ret)
-    state.programCounter = state.callstack.pop()
-    break
-  case 'DeclareVariable':
-
-    break
-  case 'JumpIf': break
-  case 'Function': break
-  case 'Apply': break
-  case 'Assign': break
-  default: throw 'Unrecognized bytecode type ' + bytecode.type
+function TypeOf(x) {
+  var to = typeof x
+  switch(to) {
+  case "undefined": return "none"
+  case "boolean": return "bool"
+  case "number": return "num"
+  case "string": return "str"
+  case "object":
+    if (Array.isArray(x))
+      return "list"
+    if (x.constructor === Map)
+      return "dict"
+    throw x.constructor
+  case "function": return "func"
+  default: throw "Urecognized TypeOf: " + to
   }
 }
-
-function Fetch(state) {
-  return state.bytecodes[state.programCounter++]
-}
-
-function NewState(bytecodes) {
-
-  var labeltable = {}
-
-  for (var i = 0; i < bytecodes.length; i++)
-    if (bytecodes[i].type === 'Label')
-      labeltable[bytecodes[i].id] = i
-
-  return {
-
-    pause: false,
-
-    stack: [],
-    scope: {},
-    stackstack: [],
-    scopestack: [],
-    arguments: undefined,
-    callstack = [],
-
-    labeltable: labeltable,
-    programCounter: 0,
-    bytecodes: bytecodes
+function Truthy(x) {
+  switch(TypeOf(x)) {
+  case "none": return false
+  case "bool": return x
+  case "num": return x !== 0
+  case "str": return x.length > 0
+  case "list": return x.length > 0
   }
+  throw "Tried to Truthy: " + TypeOf(x)
+}
+var XXNone = undefined
+function XXNot(x) { return !Truthy(x) }
+function XXEqual(a, b) {
+  switch(TypeOf(a)) {
+  case "none":
+  case "bool":
+  case "num":
+  case "str": return a === b
+  case "list":
+    if (TypeOf(b) !== "list") { return false }
+    if (b.length !== a.length) { return false }
+    for (var i = 0; i < a.length; i++)
+      if (!XXEqual(a[i], b[i]))
+        return false
+    return true
+  }
+  throw "Tried to Equal: " + TypeOf(a) + " and " + TypeOf(b)
+}
+function XXLessThan(a, b) {
+  switch(TypeOf(a)) {
+  case "bool":
+  case "num":
+  case "str": return a < b
+  }
+  throw "Tried to LessThan: " + TypeOf(a) + " and " + TypeOf(b)
+}
+function XXRepr(x) {
+  switch(TypeOf(x)) {
+  case "num": return x.toString()
+  case "str": return '"' + x.replace('\n', '\\n').replace('"', '\\"') + '"'
+  case "list":
+    var s = '['
+    for (var i = 0; i < x.length; i++) {
+      if (i > 0)
+        s += ', '
+      s += XXRepr(x[i])
+    }
+    s += ']'
+    return s
+  }
+  throw "Tried to Repr " + TypeOf(x)
+}
+function XXBool(x) {
+  return Truthy(x)
+}
+function XXInt(x) {
+  switch(TypeOf(x)) {
+  case "none": return 0
+  case "bool": return x ? 1 : 0
+  case "num": return Math.floor(x)
+  case "str": return parseInt(x)
+  }
+  throw "Tried to Int " + TypeOf(x)
+}
+function XXFloat(x) {
+  switch(TypeOf(x)) {
+  case "none": return 0
+  case "bool": return x ? 1 : 0
+  case "num": return x
+  case "str": return parseFloat(x)
+  }
+  throw "Tried to Float " + TypeOf(x)
+}
+function XXString(x) {
+  switch(TypeOf(x)) {
+  case "none": return "None"
+  case "bool": return x ? "True" : "False"
+  case "num": return x.toString()
+  case "str": return x
+  case "list": return XXRepr(x)
+  }
+  throw "Tried to String " + TypeOf(x)
+}
+function XXRead() {
+  // TODO: Find more portable but still synchronous solution.
+  return require('fs').readFileSync('/dev/stdin').toString()
+}
+function XXPrint(x) {
+  XXPrints([x])
+  return x
+}
+function XXPrints(xs) {
+  console.log.apply(null, xs.map(XXString))
+}
+function XXNegate(x) {
+  switch(TypeOf(x)) {
+  case 'num': return -x
+  }
+  throw "Tried to Negate " + TypeOf(x)
+}
+function XXAdd(a, b) {
+  switch(TypeOf(a)) {
+  case "num":
+    switch(TypeOf(b)) {
+    case "num": return a + b
+    }
+  case "str":
+    switch(TypeOf(b)) {
+    case "str": return a + b
+    }
+  }
+  throw "Tried to Add " + TypeOf(a) + " and " + TypeOf(b)
+}
+function XXSubtract(a, b) {
+  switch(TypeOf(a)) {
+  case "num":
+    switch(TypeOf(b)) {
+    case "num": return a - b
+    }
+  }
+  throw "Tried to Subtract " + TypeOf(a) + " and " + TypeOf(b)
+}
+function XXMultiply(a, b) {
+  switch(TypeOf(a)) {
+  case "num":
+    switch(TypeOf(b)) {
+    case "num": return a * b
+    }
+  }
+  throw "Tried to Multiply " + TypeOf(a) + " and " + TypeOf(b)
+}
+function XXSize(xs) {
+  switch(TypeOf(xs)) {
+  case 'str': return xs.length
+  case 'list': return xs.length
+  }
+  throw "Tried to Size " + TypeOf(xs)
+}
+function XXGetItem(xs, i) {
+  switch(TypeOf(xs)) {
+  case 'list':
+    switch(TypeOf(i)) {
+    case 'num':
+      if (i < 0 || i >= xs.length)
+        throw "Tried to GetItem of length " + xs.length + " but index is out of bounds " + i
+      return xs[i]
+    }
+  }
+  throw "Tried to GetItem " + TypeOf(xs) + " and " + TypeOf(i)
+}
+function XXSetItem(xs, i, value) {
+  switch(TypeOf(xs)) {
+  case 'list':
+    switch(TypeOf(i)) {
+    case 'num':
+      if (i < 0 || i >= xs.length)
+        throw "Tried to SetItem of length " + xs.length + " but index is out of bounds " + i
+      return xs[i] = value
+    }
+  }
+  throw "Tried to SetItem " + TypeOf(xs) + " and " + TypeOf(i) + " and " + TypeOf(value)
+}
+function XXPush(xs, x) {
+  xs.push(x)
+}
+function XXStrip(str) {
+  switch(TypeOf(str)) {
+  case 'str': return str.replace(/^\s+|\s+$/g, '')
+  }
+  throw "Tried to Strip " + TypeOf(x)
+}
+function XXSlice(args, lower, upper, step) {
+  if (lower === undefined) lower = 0
+  if (upper === undefined) upper = args.length
+  if (step === undefined) step = 1
+  lower = (lower + args.length) % args.length
+  upper = (upper + args.length) % args.length
+  if (step !== 1)
+    throw "Non-unit step slicing not yet supported: " + step
+  if (upper === 0)
+    upper = args.length
+  return args.slice(lower, upper)
+}
+function XXSplit(s) {
+  return s.split(/\s+/).filter(function(x) { return x !== '' })
+}
+function XXSplitLines(s) {
+  return s.split(/\n+/).filter(function(x) { return x !== '' })
 }
 
 ;"""
-
-
-NATIVE_EPILOGUE = ";Run(NewState(bytecodes))"
 
 
 PRELUDE = r"""
@@ -524,134 +656,58 @@ def AnnotateParseResultsWithVariableDeclarations(node):
   return variables
 
 
-def ModuleToBytecodes(module):
-
-  def MakeNewlabel():
-    MakeNewlabel.counter += 1
-    return {'type': 'Label', 'id': MakeNewlabel.counter}
-  MakeNewlabel.counter = 0
-
-  def NodeToBytecodes(node):
-    if node['type'] == 'Module':
-      bytecodes = [{'type': 'DeclareVariable', 'name': name} for name in node['variables']]
-      for expr in node['expressions']:
-        bytecodes.append({'type': 'PushStack'})
-        bytecodes.extend(NodeToBytecodes(expr))
-        bytecodes.append({'type': 'PopStack'})
-      return bytecodes
-
-    elif node['type'] == 'Block':
-      bytecodes = []
-      if node['expressions']:
-        for expr in node['expressions'][:-1]:
-          bytecodes.append({'type': 'PushStack'})
-          bytecodes.extend(NodeToBytecodes(expr))
-          bytecodes.append({'type': 'PopStack'})
-        bytecodes.extend(NodeToBytecodes(node['expressions'][-1]))
-      return bytecodes
-
-    elif node['type'] == 'If':
-      before_body = MakeNewlabel()
-      before_else = MakeNewlabel()
-      after_else = MakeNewlabel()
-      bytecodes = NodeToBytecodes(node['test'])
-      bytecodes.append({'type': 'JumpIf', 'id': before_body['id']})
-      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
-      bytecodes.append({'type': 'JumpIf', 'id': before_else['id']})
-      bytecodes.append(before_body)
-      bytecodes.extend(NodeToBytecodes(node['body']))
-      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
-      bytecodes.append({'type': 'JumpIf', 'id': after_else['id']})
-      bytecodes.append(before_else)
-      bytecodes.extend(NodeToBytecodes(node['else']))
-      bytecodes.append(after_else)
-      return bytecodes
-
-    elif node['type'] == 'While':
-      before_test = MakeNewlabel()
-      before_body = MakeNewlabel()
-      after_body = MakeNewlabel()
-      bytecodes = [before_test]
-      bytecodes.extend(NodeToBytecodes(node['test']))
-      bytecodes.append({'type': 'JumpIf', 'id': before_body['id']})
-      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
-      bytecodes.append({'type': 'JumpIf', 'id': after_body['id']})
-      bytecodes.append(before_body)
-      bytecodes.extend(NodeToBytecodes(node['body']))
-      bytecodes.append(after_body)
-      return bytecodes
-
-    elif node['type'] in ('LookupVariable', 'Number', 'String',):
-      return [node]
-
-    elif node['type'] == 'List':
-      bytecodes = [{'type': 'StartList'}]
-      for expr in node['value']:
-        bytecodes.extend(bytecodes)
-      bytecodes.append({'type': 'EndList'})
-      return bytecodes
-
-    elif node['type'] == 'Function':
-      before_body = MakeNewlabel()
-      after_body = MakeNewlabel()
-      bytecodes = []
-      bytecodes.append({'type': 'LookupVariable', 'name': 'True'})
-      bytecodes.append({'type': 'JumpIf', 'id': after_body['id']})
-      bytecodes.append(before_body)
-      bytecodes.append({'type': 'StartFunction', 'arguments': node['arguments']})
-      bytecodes.extend({'type': 'DeclareVariable', 'name': name} for name in node['variables'])
-      bytecodes.append({'type': 'LookupVariable', 'name': 'None'})
-      bytecodes.extend(NodeToBytecodes(node['body']))
-      bytecodes.append({'type': 'Return'})
-      bytecodes.append(after_body)
-      bytecodes.append({'type': 'Function', 'id': before_body['id']})
-      return bytecodes
-
-    elif node['type'] == 'Call':
-      bytecodes = NodeToBytecodes(node['function'])
-      bytecodes = [{'type': 'StartList'}]
-      for expr in node['arguments']:
-        bytecodes.extend(bytecodes)
-      bytecodes.append({'type': 'EndList'})
-      bytecodes.append({'type': 'Apply'})
-      return bytecodes
-
-    elif node['type'] == 'Assign':
-      bytecodes = NodeToBytecodes(node['value'])
-      bytecodes.append({'type': 'Assign', 'target': node['target']})
-      return bytecodes
-
-    raise SyntaxError('Unrecognized type ' + node['type'])
-
-  return NodeToBytecodes(module)
-
-
 def SanitizeStringForJavascript(s):
   return '+'.join('String.fromCharCode(%d)' % ord(c) for c in s)
 
 
-def BytecodesToJavascript(bytecodes):
-  s = NATIVE_PRELUDE + ';var bytecodes = ['
-  for i, bytecode in enumerate(bytecodes):
-    if i > 0:
-      s += ','
-    s += '{'
-    type_ = bytecode['type']
-    for j, (key, value) in enumerate(bytecode.items()):
-      if j > 0:
-        s += ','
-      s += repr(key) + ':'
-      if type_ == 'String' and key == 'value':
-        s += SanitizeStringForJavascript(value)
-      else:
-        s += repr(value)
-    s += '}'
-  s += ']' + NATIVE_EPILOGUE + '\n'
-  return s
-
-
 def Translate(source):
-  return BytecodesToJavascript(ModuleToBytecodes(Parse(source)))
+
+  def Name(name):
+    return 'XX' + name
+
+  def Declare(names):
+    return 'var %s;' % ','.join(map(Name, names)) if names else ''
+
+  def Block(exprs):
+    return '((function(){%s;return %s})())' % (';'.join(map(TranslateNode, exprs[:-1])), TranslateNode(exprs[-1])) if exprs else 'undefined'
+
+  def TranslateNode(node):
+    if node['type'] == 'Module':
+      return NATIVE_PRELUDE + Declare(node['variables']) + Block(node['expressions'])
+
+    elif node['type'] == 'Block':
+      return Block(node['expressions'])
+
+    elif node['type'] == 'If':
+      return '(Truthy(%s))?(%s):(%s)' % (TranslateNode(node['test']), TranslateNode(node['body']), TranslateNode(node['else']))
+
+    elif node['type'] == 'While':
+      return '(function(){var last;while(Truthy(%s)){last=%s;}return last;})()' % (TranslateNode(node['test']), TranslateNode(node['body']))
+
+    elif node['type'] == 'LookupVariable':
+      return Name(node['name'])
+
+    elif node['type'] == 'Number':
+      return str(node['value'])
+
+    elif node['type'] == 'String':
+      return SanitizeStringForJavascript(node['value'])
+
+    elif node['type'] == 'List':
+      return '[%s]' % ','.join(map(TranslateNode, node['value']))
+
+    elif node['type'] == 'Function':
+      return 'function(%s){%sreturn %s}' % (','.join(map(Name, node['arguments'])), Declare(node['variables']), TranslateNode(node['body']))
+
+    elif node['type'] == 'Call':
+      return '((%s)(%s))' % (TranslateNode(node['function']), ','.join(map(TranslateNode, node['arguments'])))
+
+    elif node['type'] == 'Assign':
+      return '(%s=%s)' % (Name(node['target']), TranslateNode(node['value']))
+
+    raise SyntaxError('Unrecognized type ' + node['type'])
+
+  return '// Autogenerated CCL code\n// ' + SanitizeStringForJavascript(source) + '\n' + TranslateNode(Parse(source)) + '\n'
 
 
 if __name__ == '__main__':
