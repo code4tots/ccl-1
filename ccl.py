@@ -5,7 +5,7 @@ import sys
 SYMBOLS = (
     '\\','.',
     ':',
-    '+', '-',
+    '+', '-', '%',
     '(', ')', '[', ']', ',', '=',
     '==', '<', '>', '<=', '>=', '!=',
     ';',
@@ -160,6 +160,15 @@ function XXSubtract(a, b) {
   }
   throw "Tried to Subtract " + TypeOf(a) + " and " + TypeOf(b)
 }
+function XXModulo(a, b) {
+  switch(TypeOf(a)) {
+  case "num":
+    switch(TypeOf(b)) {
+    case "num": return a % b
+    }
+  }
+  throw "Tried to Modulo " + TypeOf(a) + " and " + TypeOf(b)
+}
 function XXMultiply(a, b) {
   switch(TypeOf(a)) {
   case "num":
@@ -178,6 +187,13 @@ function XXSize(xs) {
 }
 function XXGetItem(xs, i) {
   switch(TypeOf(xs)) {
+  case 'str':
+    switch(TypeOf(i)) {
+    case 'num':
+      if (i < 0 || i >= xs.length)
+        throw "Tried to GetItem of length " + xs.length + " but index is out of bounds " + i
+      return xs[i]
+    }
   case 'list':
     switch(TypeOf(i)) {
     case 'num':
@@ -257,6 +273,12 @@ GreaterThanOrEqual = \ left right
 
 GreaterThan = \ left right
   Not(left <= right)
+
+For = \ args f
+  i = 0
+  while i < Size(args)
+    f(args[i])
+    i = i + 1
 
 Map = \ f args
   newargs = []
@@ -517,11 +539,21 @@ def Parse(s):
       return Call(Name('Negate'), [PrefixExpression()])
     return PostfixExpression()
 
-  def AdditiveExpression():
+  def MultiplicativeExpression():
     expr = PrefixExpression()
     while True:
-      if Consume('+'):
+      if Consume('%'):
         rhs = PrefixExpression()
+        expr = Call(Name('Modulo'), [expr, rhs])
+      else:
+        break
+    return expr
+
+  def AdditiveExpression():
+    expr = MultiplicativeExpression()
+    while True:
+      if Consume('+'):
+        rhs = MultiplicativeExpression()
         expr = Call(Name('Add'), [expr, rhs])
       else:
         break
