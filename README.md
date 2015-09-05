@@ -8,15 +8,6 @@ Module
 Block: Expression
   expressions: [Expression]
 
-If: Expression
-  test: Expression
-  body: Expression
-  else: Expression
-
-While: Expression
-  test: Expression
-  body: Expression
-
 LookupVariable: Expression
   name: str
 

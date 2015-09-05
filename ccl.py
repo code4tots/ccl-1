@@ -18,336 +18,99 @@ KEYWORDS = (
     'and', 'or',
 )
 
-
 NATIVE_PRELUDE = r"""'use strict';
 
 function TypeOf(x) {
   var to = typeof x
   switch(to) {
-  case "undefined": return "none"
-  case "boolean": return "bool"
-  case "number": return "num"
-  case "string": return "str"
+  case "undefined": return "None"
+  case "boolean": return "Bool"
+  case "number": return "Number"
+  case "string": return "String"
   case "object":
     if (Array.isArray(x))
-      return "list"
-    if (x.constructor === Map)
-      return "dict"
-    throw x.constructor
-  case "function": return "func"
+      return "List"
+    return "Object"
+  case "function": return "Function"
   default: throw "Urecognized TypeOf: " + to
   }
 }
-function Truthy(x) {
-  switch(TypeOf(x)) {
-  case "none": return false
-  case "bool": return x
-  case "num": return x !== 0
-  case "str": return x.length > 0
-  case "list": return x.length > 0
+
+var XXNone, XXTrue = true, XXFalse = false;
+
+function XXGetAttribute(owner, attr) {
+  var type = TypeOf(owner)
+  switch(type) {
+  case "None":
+    switch(attr) {
+    case "Inspect": return function() { return "None" }
+    case "Truthy": return function() { return false }
+    }
+    break
+  case "Bool":
+    switch(attr) {
+    case "Inspect": return function() { return owner ? "True" : "False" }
+    case "Truthy": return function() { return owner }
+    }
+    break
+  case "Number":
+    switch(attr) {
+    case "Inspect": return function() { return owner.toString() }
+    case "Truthy": return function() { return owner !== 0 }
+    }
+    break
+  case "String":
+    switch(attr) {
+    case "Inspect": return function() { return '"' + owner.replace('"', '\\"').replace("\n", "\\n").replace("\\", "\\\\").replace("\t", "\\t") + '"' }
+    case "String": return function() { return owner }
+    }
+    break
+  case "List":
+    switch(attr) {
+    case "Inspect": return function() {
+        var s = '['
+        for (var i = 0; i < owner.length; i++) {
+          if (i > 0)
+            s += ', '
+          s += XXGetAttribute(owner[i], "Inspect")()
+        }
+        s += ']'
+        return s
+      }
+      case "Push": return function(value) { owner.push(value) }
+    }
+    break
+  case "Function":
+    case "Inspect": return function() { return "Function" }
+    break
+  case "Object":
+    break
   }
-  throw "Tried to Truthy: " + TypeOf(x)
+  if (type === "String" || type === "List") {
+    switch(attr) {
+    case "Size": return function() { return owner.length }
+    case "Map": return function(f) { return owner.map(f) }
+    case "Each": return function(f) {
+        var last
+        for (var i = 0; i < owner.length; i++)
+          last = f(owner[i])
+        return last
+      }
+    case "Truthy": return function() { return owner.length !== 0 }
+    }
+  }
+  switch(attr) {
+  case "Print": return function() { console.log(XXGetAttribute(owner, "String")()) }
+  case "String": return XXGetAttribute(owner, "Inspect")
+  case "Truthy": return function() { return true }
+  }
+  throw "Tried to GetAttribute " + type + " with attribute " + attr
 }
-function XXIs(a, b) { return a === b }
 function XXAssert(x, message) { if (!Truthy(x)) throw message }
-function XXType(x) {
-  switch(TypeOf(x)) {
-  case "none": return XXNone
-  case "bool": return XXBool
-  case "num": return XXFloat
-  case "str": return XXString
-  case "list": return XXList
-  }
-  throw "Tried to get Type of: " + TypeOf(x)
-}
-var XXNone = undefined
-function XXError(message) { throw message }
-function XXNot(x) { return !Truthy(x) }
-function XXEqual(a, b) {
-  switch(TypeOf(a)) {
-  case "none":
-  case "bool":
-  case "num":
-  case "str": return a === b
-  case "list":
-    if (TypeOf(b) !== "list") { return false }
-    if (b.length !== a.length) { return false }
-    for (var i = 0; i < a.length; i++)
-      if (!XXEqual(a[i], b[i]))
-        return false
-    return true
-  }
-  throw "Tried to Equal: " + TypeOf(a) + " and " + TypeOf(b)
-}
-function XXLessThan(a, b) {
-  switch(TypeOf(a)) {
-  case "bool":
-  case "num":
-  case "str": return a < b
-  }
-  throw "Tried to LessThan: " + TypeOf(a) + " and " + TypeOf(b)
-}
-function XXRepr(x) {
-  switch(x) {
-  case XXInt: return "Int"
-  case XXFloat: return "Float"
-  case XXString: return "String"
-  }
-  switch(TypeOf(x)) {
-  case "num": return x.toString()
-  case "str": return '"' + x.replace('\n', '\\n').replace('"', '\\"') + '"'
-  case "list":
-    var s = '['
-    for (var i = 0; i < x.length; i++) {
-      if (i > 0)
-        s += ', '
-      s += XXRepr(x[i])
-    }
-    s += ']'
-    return s
-  }
-  throw "Tried to Repr " + TypeOf(x)
-}
-function XXBool(x) {
-  return Truthy(x)
-}
-function XXInt(x) {
-  switch(TypeOf(x)) {
-  case "none": return 0
-  case "bool": return x ? 1 : 0
-  case "num": return Math.floor(x)
-  case "str": return parseInt(x)
-  }
-  throw "Tried to Int " + TypeOf(x)
-}
-function XXFloat(x) {
-  switch(TypeOf(x)) {
-  case "none": return 0
-  case "bool": return x ? 1 : 0
-  case "num": return x
-  case "str": return parseFloat(x)
-  }
-  throw "Tried to Float " + TypeOf(x)
-}
-function XXString(x) {
-  switch(TypeOf(x)) {
-  case "none": return "None"
-  case "bool": return x ? "True" : "False"
-  case "num": return x.toString()
-  case "str": return x
-  default: return XXRepr(x)
-  }
-  throw "Tried to String " + TypeOf(x)
-}
-function XXRead() {
-  // TODO: Find more portable but still synchronous solution.
-  return require('fs').readFileSync('/dev/stdin').toString()
-}
-function XXPrint(x) {
-  XXPrints([x])
-  return x
-}
-function XXPrints(xs) {
-  console.log.apply(null, xs.map(XXString))
-}
-function XXNegate(x) {
-  switch(TypeOf(x)) {
-  case 'num': return -x
-  }
-  throw "Tried to Negate " + TypeOf(x)
-}
-function XXAdd(a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": return a + b
-    }
-  case "str":
-    switch(TypeOf(b)) {
-    case "str": return a + b
-    }
-  }
-  throw "Tried to Add " + TypeOf(a) + " and " + TypeOf(b)
-}
-function XXSubtract(a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": return a - b
-    }
-  }
-  throw "Tried to Subtract " + TypeOf(a) + " and " + TypeOf(b)
-}
-function XXModulo(a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": return a % b
-    }
-  }
-  throw "Tried to Modulo " + TypeOf(a) + " and " + TypeOf(b)
-}
-function XXMultiply(a, b) {
-  switch(TypeOf(a)) {
-  case "num":
-    switch(TypeOf(b)) {
-    case "num": return a * b
-    }
-  }
-  throw "Tried to Multiply " + TypeOf(a) + " and " + TypeOf(b)
-}
-function XXSize(xs) {
-  switch(TypeOf(xs)) {
-  case 'str': return xs.length
-  case 'list': return xs.length
-  }
-  throw "Tried to Size " + TypeOf(xs)
-}
-function XXGetItem(xs, i) {
-  switch(TypeOf(xs)) {
-  case 'str':
-    switch(TypeOf(i)) {
-    case 'num':
-      if (i < 0 || i >= xs.length)
-        throw "Tried to GetItem of length " + xs.length + " but index is out of bounds " + i
-      return xs[i]
-    }
-  case 'list':
-    switch(TypeOf(i)) {
-    case 'num':
-      if (i < 0 || i >= xs.length)
-        throw "Tried to GetItem of length " + xs.length + " but index is out of bounds " + i
-      return xs[i]
-    }
-  }
-  throw "Tried to GetItem " + TypeOf(xs) + " and " + TypeOf(i)
-}
-function XXSetItem(xs, i, value) {
-  switch(TypeOf(xs)) {
-  case 'list':
-    switch(TypeOf(i)) {
-    case 'num':
-      if (i < 0 || i >= xs.length)
-        throw "Tried to SetItem of length " + xs.length + " but index is out of bounds " + i
-      return xs[i] = value
-    }
-  }
-  throw "Tried to SetItem " + TypeOf(xs) + " and " + TypeOf(i) + " and " + TypeOf(value)
-}
-function XXPush(xs, x) {
-  xs.push(x)
-}
-function XXStrip(str) {
-  switch(TypeOf(str)) {
-  case 'str': return str.replace(/^\s+|\s+$/g, '')
-  }
-  throw "Tried to Strip " + TypeOf(x)
-}
-function XXSlice(args, lower, upper, step) {
-  if (lower === undefined) lower = 0
-  if (upper === undefined) upper = args.length
-  if (step === undefined) step = 1
-  if (lower < 0)
-    lower += args.length
-  if (upper <= 0)
-    upper += args.length
-  if (step !== 1)
-    throw "Non-unit step slicing not yet supported: " + step
-  return args.slice(lower, upper)
-}
-function XXSplit(s) {
-  return s.split(/\s+/).filter(function(x) { return x !== '' })
-}
-function XXSplitLines(s) {
-  return s.split(/\n+/).filter(function(x) { return x !== '' })
-}
-function XXSquareRoot(x) {
-  switch(TypeOf(x)) {
-  case 'num':
-    return Math.sqrt(x)
-  }
-  throw "Tried to SquareRoot " + TypeOf(x)
-}
-function XXCeiling(x) {
-  switch(TypeOf(x)) {
-  case 'num':
-    return Math.ceil(x)
-  }
-  throw "Tried to Ceiling " + TypeOf(x)
-}
-function XXFloor(x) {
-  switch(TypeOf(x)) {
-  case 'num':
-    return Math.floor(x)
-  }
-  throw "Tried to Floor " + TypeOf(x)
-}
 ;"""
 
-
 PRELUDE = r"""
-
-###########
-## Builtins
-###########
-
-Or = \ left rightthunk
-  if left
-    left
-  else
-    rightthunk()
-
-And = \ left rightthunk
-  if Not(left)
-    left
-  else
-    rightthunk()
-
-LessThanOrEqual = \ left right
-  left == right or left < right
-
-GreaterThanOrEqual = \ left right
-  Not(left < right)
-
-GreaterThan = \ left right
-  Not(left <= right)
-
-For = \ args f
-  i = 0
-  while i < Size(args)
-    f(args[i])
-    i = i + 1
-
-Map = \ f args
-  newargs = []
-  i = 0
-  while i < Size(args)
-    Push(newargs, f(args[i]))
-    i = i + 1
-  newargs
-
-FoldLeft = \ f init args
-  i = 0
-  while i < Size(args)
-    init = f(init, args[i])
-    i = i + 1
-  init
-
-# Fold implies operation is associative and potentially allows for parallel computing.
-
-Fold = FoldLeft
-
-Reduce = \ f args
-  if Size(args) < 1
-    Error("Reduce's second argument must be a non-empty list, but found an empty one")
-  Fold(f, args[0], args[1:])
-
-###################
-## End of builtins.
-###################
-
 """
-
 
 def Lex(s):
   tokens = []
@@ -512,12 +275,12 @@ def Parse(s):
       if Consume('else'):
         EatExpressionDelimiters()
         else_ = Expression()
-      return {'type': 'If', 'test': test, 'body': body, 'else': else_}
+      return Call(Name('If'), [test, Suspend(body), Suspend(else_)])
     elif Consume('while'):
       test = Expression()
       EatExpressionDelimiters()
       body = Expression()
-      return {'type': 'While', 'test': test, 'body': body}
+      return Call(Name('While'), [Suspend(test), Suspend(body)])
     elif At('id'):
       return Name(GetToken()[1])
     elif At('num'):
@@ -568,7 +331,7 @@ def Parse(s):
           Expect(']')
           expr = Call(Name('Slice'), [expr, index, upper, step])
       elif Consume('.'):
-        attr = Expect('id').value
+        attr = Expect('id')[1]
         expr = Call(Name('GetAttribute'), [expr, {'type': 'String', 'value': attr}])
       else:
         break
