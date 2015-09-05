@@ -261,7 +261,27 @@ function XXSplit(s) {
 function XXSplitLines(s) {
   return s.split(/\n+/).filter(function(x) { return x !== '' })
 }
-
+function XXSquareRoot(x) {
+  switch(TypeOf(x)) {
+  case 'num':
+    return Math.sqrt(x)
+  }
+  throw "Tried to SquareRoot " + TypeOf(x)
+}
+function XXCeiling(x) {
+  switch(TypeOf(x)) {
+  case 'num':
+    return Math.ceil(x)
+  }
+  throw "Tried to Ceiling " + TypeOf(x)
+}
+function XXFloor(x) {
+  switch(TypeOf(x)) {
+  case 'num':
+    return Math.floor(x)
+  }
+  throw "Tried to Floor " + TypeOf(x)
+}
 ;"""
 
 
@@ -575,6 +595,9 @@ def Parse(s):
       if Consume('+'):
         rhs = MultiplicativeExpression()
         expr = Call(Name('Add'), [expr, rhs])
+      if Consume('-'):
+        rhs = MultiplicativeExpression()
+        expr = Call(Name('Subtract'), [expr, rhs])
       else:
         break
     return expr

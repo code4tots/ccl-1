@@ -1,0 +1,2 @@
+For(Map(\line. Map(Int, Split(line)), SplitLines(Read())[1:])) \ AB
+  Print(-Reduce(Subtract, Map(\x. Floor(SquareRoot(x)), [AB[0]-1, AB[1]])))
