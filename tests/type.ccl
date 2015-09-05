@@ -1,1 +1,1 @@
-Assert(Type(5) is Float, "Type(5) is not Float?")
+Assert((5).__Type__() is 'Number', "(5).__Type__() is not 'Number'?")

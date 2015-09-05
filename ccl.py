@@ -19,7 +19,6 @@ KEYWORDS = (
 )
 
 NATIVE_PRELUDE = r"""'use strict';
-
 function TypeOf(x) {
   var to = typeof x
   switch(to) {
@@ -35,49 +34,70 @@ function TypeOf(x) {
   default: throw "Urecognized TypeOf: " + to
   }
 }
-
 var XXNone, XXTrue = true, XXFalse = false;
-
+function XXRead() {
+  // TODO: Find more portable but still synchronous solution.
+  return require('fs').readFileSync('/dev/stdin').toString()
+}
 function XXGetAttribute(owner, attr) {
   var type = TypeOf(owner)
   switch(type) {
   case "None":
     switch(attr) {
     case "Inspect": return function() { return "None" }
-    case "Truthy": return function() { return false }
+    case "__Bool__": return function() { return false }
     }
     break
   case "Bool":
     switch(attr) {
     case "Inspect": return function() { return owner ? "True" : "False" }
-    case "Truthy": return function() { return owner }
+    case "__Bool__": return function() { return owner }
     }
     break
   case "Number":
     switch(attr) {
     case "Inspect": return function() { return owner.toString() }
-    case "Truthy": return function() { return owner !== 0 }
+    case "__Bool__": return function() { return owner !== 0 }
+    case "__Add__": return function(right) {
+      var rtype = TypeOf(right)
+      switch(rtype) {
+      case "Number": return owner + right
+      }
+      throw "Tried to Number.__Add__ " + rtype
+    }
     }
     break
   case "String":
     switch(attr) {
     case "Inspect": return function() { return '"' + owner.replace('"', '\\"').replace("\n", "\\n").replace("\\", "\\\\").replace("\t", "\\t") + '"' }
+    case "Int": return function() { return parseInt(owner) }
     case "String": return function() { return owner }
+    case "Strip": return function() { return str.replace(/^\s+|\s+$/g, '') }
+    case "SplitWords": return function() { return owner.split(/\s+/).filter(function(x) { return x !== '' }) }
+    case "SplitLines": return function() { return owner.split(/\n+/).filter(function(x) { return x !== '' }) }
     }
     break
   case "List":
     switch(attr) {
     case "Inspect": return function() {
-        var s = '['
-        for (var i = 0; i < owner.length; i++) {
-          if (i > 0)
-            s += ', '
-          s += XXGetAttribute(owner[i], "Inspect")()
-        }
-        s += ']'
-        return s
+      var s = '['
+      for (var i = 0; i < owner.length; i++) {
+        if (i > 0)
+          s += ', '
+        s += XXGetAttribute(owner[i], "Inspect")()
       }
-      case "Push": return function(value) { owner.push(value) }
+      s += ']'
+      return s
+    }
+    case "Push": return function(value) { owner.push(value) }
+    case "__Equal__": return function(right) {
+      if (owner.length !== right.length)
+        return false
+      for (var i = 0; i < owner.length; i++)
+        if (!XXGetAttribute(owner[i], "__Equal__")(right[i]))
+          return false
+      return true
+    }
     }
     break
   case "Function":
@@ -96,17 +116,51 @@ function XXGetAttribute(owner, attr) {
           last = f(owner[i])
         return last
       }
-    case "Truthy": return function() { return owner.length !== 0 }
+    case "__Bool__": return function() { return owner.length !== 0 }
+    case "__Slice__": return function(lower, upper, step) {
+      if (lower === undefined) lower = 0
+      if (upper === undefined) upper = owner.length
+      if (step === undefined) step = 1
+      if (lower < 0)
+        lower += owner.length
+      if (upper <= 0)
+        upper += owner.length
+      if (step !== 1)
+        throw "Non-unit step slicing not yet supported: " + step
+      return owner.slice(lower, upper)
+    }
+    case "FoldLeft": return function(init, f) {
+      for (var i = 0; i < owner.length; i++)
+        init = f(init, owner[i])
+      return init
+    }
+    case "Reduce": return function(f) {
+      if (owner.length < 1)
+        throw "Reduce requires an iterable with at least one element"
+      return XXGetAttribute(owner.slice(1), "FoldLeft")(owner[0], f)
+    }
     }
   }
   switch(attr) {
   case "Print": return function() { console.log(XXGetAttribute(owner, "String")()) }
   case "String": return XXGetAttribute(owner, "Inspect")
-  case "Truthy": return function() { return true }
+  case "__Bool__": return function() { return true }
+  case "__Equal__": return function(right) { return owner === right }
+  case "__Is__": return function(right) { return owner === right }
+  case "__Type__": return function() { return TypeOf(owner) }
   }
   throw "Tried to GetAttribute " + type + " with attribute " + attr
 }
-function XXAssert(x, message) { if (!Truthy(x)) throw message }
+function XXAssert(x, message) { if (!XXGetAttribute(x, '__Bool__')()) throw message }
+function XXIf(test, suspended_body, suspended_else) {
+  return XXGetAttribute(test, '__Bool__')() ? suspended_body() : suspended_else()
+}
+function XXWhile(suspended_test, suspended_body) {
+  var last
+  while (XXGetAttribute(suspended_test(), '__Bool__')())
+    last = suspended_body()
+  return last
+}
 ;"""
 
 PRELUDE = r"""
@@ -244,6 +298,9 @@ def Parse(s):
   def Call(f, args):
     return {'type': 'Call', 'function': f, 'arguments': args}
 
+  def CallMethod(owner, name, args):
+    return Call(Call(Name('GetAttribute'), [owner, {'type': 'String', 'value': name}]), args)
+
   def Expression():
     return AssignExpression()
 
@@ -329,7 +386,7 @@ def Parse(s):
               step = Expression()
 
           Expect(']')
-          expr = Call(Name('Slice'), [expr, index, upper, step])
+          expr = CallMethod(expr, '__Slice__', [index, upper, step])
       elif Consume('.'):
         attr = Expect('id')[1]
         expr = Call(Name('GetAttribute'), [expr, {'type': 'String', 'value': attr}])
@@ -357,7 +414,7 @@ def Parse(s):
     while True:
       if Consume('+'):
         rhs = MultiplicativeExpression()
-        expr = Call(Name('Add'), [expr, rhs])
+        expr = CallMethod(expr, '__Add__', [rhs])
       if Consume('-'):
         rhs = MultiplicativeExpression()
         expr = Call(Name('Subtract'), [expr, rhs])
@@ -370,10 +427,10 @@ def Parse(s):
     while True:
       if Consume('is'):
         rhs = AdditiveExpression()
-        expr = Call(Name('Is'), [expr, rhs])
+        expr = CallMethod(expr, '__Is__', [rhs])
       elif Consume('=='):
         rhs = AdditiveExpression()
-        expr = Call(Name('Equal'), [expr, rhs])
+        expr = CallMethod(expr, '__Equal__', [rhs])
       elif Consume('<'):
         rhs = AdditiveExpression()
         expr = Call(Name('LessThan'), [expr, rhs])
@@ -532,12 +589,6 @@ def Translate(source):
 
     elif node['type'] == 'Block':
       return Block(node['expressions'])
-
-    elif node['type'] == 'If':
-      return '(Truthy(%s))?(%s):(%s)' % (TranslateNode(node['test']), TranslateNode(node['body']), TranslateNode(node['else']))
-
-    elif node['type'] == 'While':
-      return '(function(){var last;while(Truthy(%s)){last=%s;}return last;})()' % (TranslateNode(node['test']), TranslateNode(node['body']))
 
     elif node['type'] == 'LookupVariable':
       return Name(node['name'])
