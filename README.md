@@ -21,7 +21,6 @@ List: Expression
   value: [Expression]
 
 Function: Expression
-  arguments: [str]
   body: Expression
   variables: [str]
 

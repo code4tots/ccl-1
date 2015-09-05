@@ -1,0 +1,3 @@
+f = .Int()
+
+Assert(f('5') is 5, "f('5') is 5")

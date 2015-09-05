@@ -3,7 +3,7 @@
 import sys
 
 SYMBOLS = (
-    '\\','.',
+    '\\', '.', '...',
     ':',
     '+', '-', '%',
     '(', ')', '[', ']', ',', '=',
@@ -111,11 +111,13 @@ function XXGetAttribute(owner, attr) {
     case "Size": return function() { return owner.length }
     case "Map": return function(f) { return owner.map(f) }
     case "Each": return function(f) {
-        var last
-        for (var i = 0; i < owner.length; i++)
-          last = f(owner[i])
-        return last
-      }
+      if (TypeOf(f) !== "Function")
+        throw "Each expects function argumemnt, but found " + TypeOf(f)
+      var last
+      for (var i = 0; i < owner.length; i++)
+        last = f(owner[i])
+      return last
+    }
     case "__Bool__": return function() { return owner.length !== 0 }
     case "__Slice__": return function(lower, upper, step) {
       if (lower === undefined) lower = 0
@@ -128,6 +130,11 @@ function XXGetAttribute(owner, attr) {
       if (step !== 1)
         throw "Non-unit step slicing not yet supported: " + step
       return owner.slice(lower, upper)
+    }
+    case "__GetItem__": return function(index) {
+      if (TypeOf(index) !== 'Number')
+        throw "Index of GetItem must be a number but found " + TypeOf(index)
+      return owner[index]
     }
     case "FoldLeft": return function(init, f) {
       for (var i = 0; i < owner.length; i++)
@@ -310,11 +317,19 @@ def Parse(s):
       Expect(')')
       return expr
     elif Consume('['):
+      ellipsis = None
       exprs = []
       while not Consume(']'):
-        exprs.append(Expression())
+        expr = Expression()
+        if Consume('...'):
+          ellipsis = expr
+        else:
+          exprs.append(expr)
         Consume(',')
-      return {'type': 'List', 'value': exprs}
+      if ellipsis:
+        return {'type': 'List', 'value': exprs, 'ellipsis': ellipsis}
+      else:
+        return {'type': 'List', 'value': exprs}
     elif Consume('indent'):
       exprs = []
       while True:
@@ -345,15 +360,28 @@ def Parse(s):
     elif At('str'):
       return {'type': 'String', 'value': GetToken()[1]}
     elif Consume('\\'):
+      scoped = not Consume('\\')
       args = []
-      while At('id'):
-        args.append(GetToken()[1])
+      while At('id') or At('['):
+        args.append(PrimaryExpression())
       Consume('.')
       EatExpressionDelimiters()
+      assign = TransformAssign({'type': 'List', 'value': args}, Name('__arguments__'))
       body = Expression()
-      return {'type': 'Function', 'arguments': args, 'body': body}
-    else:
-      raise SyntaxError('Expected expression but found %s' % Peek()[0])
+      return {'type': 'Function', 'body': {'type': 'Block', 'expressions': [assign, body]}, 'scoped': scoped}
+    elif Consume('.'):
+      attr = Expect('id')[1]
+      Expect('(')
+      args = []
+      while not Consume(')'):
+        args.append(Expression())
+        Consume(',')
+      owner = TemporaryVariableName()
+      return {'type': 'Function', 'scoped': 'True', 'body': {'type': 'Block', 'expressions': [
+        TransformAssign(Name(owner), CallMethod(Name('__arguments__'), '__GetItem__', [{'type': 'Number', 'value': 0}])),
+        Call(Call(Name('GetAttribute'), [Name(owner), {'type': 'String', 'value': attr}]), args),
+      ]}}
+    raise SyntaxError('Expected expression but found %s' % Peek()[0])
 
   def PostfixExpression():
     expr = PrimaryExpression()
@@ -372,7 +400,7 @@ def Parse(s):
           index = Expression()
 
         if Consume(']'):
-          expr = Call(Name('GetItem'), [expr, index])
+          expr = CallMethod(expr, '__GetItem__', [index])
         else:
           Expect(':')
 
@@ -482,14 +510,13 @@ def Parse(s):
     elif target['type'] == 'Call' and target['function'] == Name('GetAttribute'):
       owner, attrexpr = target['arguments']
       return Call(Name('SetAttribute'), [owner, attrexpr, value])
-    elif target['type'] == 'Call' and target['function'] == Name('GetItem'):
-      owner, index = target['arguments']
-      return Call(Name('SetItem'), [owner, index, value])
     elif target['type'] == 'List':
       valuevar = TemporaryVariableName()
       exprs = [{'type': 'Assign', 'target': valuevar, 'value': value}]
       for i, item in enumerate(target['value']):
-        exprs.append(TransformAssign(item, Call(Name('GetItem'), [Name(valuevar), {'type': 'Number', 'value': i}])))
+        exprs.append(TransformAssign(item, CallMethod(Name(valuevar), '__GetItem__', [{'type': 'Number', 'value': i}])))
+      if 'ellipsis' in target:
+        exprs.append(TransformAssign(target['ellipsis'], CallMethod(Name(valuevar), '__Slice__', [{'type': 'Number', 'value': len(target['value'])}])))
       return {'type': 'Block', 'expressions': exprs}
     else:
       raise SyntaxError('%s is not assignable' % target['type'])
@@ -529,9 +556,13 @@ def AnnotateParseResultsWithVariableDeclarations(node):
       variables |= AnnotateParseResultsWithVariableDeclarations(expr)
 
   elif node['type'] == 'Function':
-    node['variables'] = AnnotateParseResultsWithVariableDeclarations(node['body'])
-    for arg in node['arguments']:
-      node['variables'].discard(arg)
+    if node['scoped']:
+      node['variables'] = AnnotateParseResultsWithVariableDeclarations(node['body'])
+    else:
+      assign, body = node['body']['expressions']
+      node['variables'] = AnnotateParseResultsWithVariableDeclarations(assign)
+      variables |= AnnotateParseResultsWithVariableDeclarations(body)
+    node.pop('scoped', None)
 
   elif node['type'] == 'Call':
     variables |= AnnotateParseResultsWithVariableDeclarations(node['function'])
@@ -558,6 +589,8 @@ def AnnotateParseResultsWithVariableDeclarations(node):
   elif node['type'] == 'List':
     for expr in node['value']:
       variables |= AnnotateParseResultsWithVariableDeclarations(expr)
+    if 'ellipsis' in node:
+      variables |= AnnotateParseResultsWithVariableDeclarations(node['ellipsis'])
 
   elif node['type'] in ('String', 'Number', 'LookupVariable'):
     pass
@@ -600,10 +633,12 @@ def Translate(source):
       return SanitizeStringForJavascript(node['value'])
 
     elif node['type'] == 'List':
+      if 'ellipsis' in node:
+        raise SyntaxError('Ellipsis in list literal values are not yet supported')
       return '[%s]' % ','.join(map(TranslateNode, node['value']))
 
     elif node['type'] == 'Function':
-      return 'function(%s){%sreturn %s}' % (','.join(map(Name, node['arguments'])), Declare(node['variables']), TranslateNode(node['body']))
+      return 'function(){var %s=Array.prototype.slice.call(arguments);%sreturn %s}' % (Name('__arguments__'), Declare(node['variables']), TranslateNode(node['body']))
 
     elif node['type'] == 'Call':
       return '((%s)(%s))' % (TranslateNode(node['function']), ','.join(map(TranslateNode, node['arguments'])))
