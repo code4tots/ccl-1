@@ -5,7 +5,7 @@ import sys
 SYMBOLS = (
     '\\', '.', '...',
     ':',
-    '+', '-', '%',
+    '+', '-', '*', '%',
     '(', ')', '[', ']', ',', '=',
     '==', '<', '>', '<=', '>=', '!=',
     ';',
@@ -102,6 +102,12 @@ function XXGetAttribute(owner, attr) {
     break
   case "Function":
     case "Inspect": return function() { return "Function" }
+    case "Multiply": return function(g) {
+      switch(TypeOf(g)) {
+      case "Function": return function() { g(owner.apply(null, arguments)) }
+      }
+      throw "Function.Multiply expects another function but found " + TypeOf(g)
+    }
     break
   case "Object":
     break
@@ -430,6 +436,9 @@ def Parse(s):
   def MultiplicativeExpression():
     expr = PrefixExpression()
     while True:
+      if Consume('*'):
+        rhs = PrefixExpression()
+        expr = CallMethod(expr, '__Multiply__', [rhs])
       if Consume('%'):
         rhs = PrefixExpression()
         expr = Call(Name('Modulo'), [expr, rhs])
@@ -476,7 +485,11 @@ def Parse(s):
     return expr
 
   def Suspend(expr):
-    return {'type': 'Function', 'arguments': [], 'body': expr}
+    return {'type': 'Function', 'arguments': [], 'body':
+      {'type': 'Block', 'expressions': [
+        {'type': 'Block', 'expressions': []},
+        expr,
+      ]}, 'scoped': False}
 
   def LogicalAndExpression():
     expr = CompareExpression()
