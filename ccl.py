@@ -26,7 +26,10 @@ NATIVE_PRELUDE = r"""'use strict';
 Object.prototype.XXString = function() { return this.XXInspect(); }
 Object.prototype.XX__Equal__ = function(other) { return this === other }
 Object.prototype.XX__Add__ = function(other) { return this + other }
-Object.prototype.XX__Subtract__ = function(other) { return this + other }
+Object.prototype.XX__Subtract__ = function(other) { return this - other }
+Object.prototype.XX__Multiply__ = function(other) { return this * other }
+Object.prototype.XX__Divide__ = function(other) { return this / other }
+Object.prototype.XX__Modulo__ = function(other) { return this % other }
 Object.prototype.XXPrint = function() { return console.log(this.XXString()) }
 
 var XXNone = new Object(), XXTrue = true, XXFalse = false
@@ -65,6 +68,23 @@ Array.prototype.XX__Equal__ = function(other) {
 Array.prototype.XXMap = function(f) { return this.map(f) }
 Array.prototype.XX__Bool__ = function() { return this.length !== 0 }
 Array.prototype.XXPush = function(x) { this.push(x); return this }
+Array.prototype.XXGet = function(index) {
+  if (index < 0)
+    index += this.length
+  if (index < 0 || index >= this.length)
+    throw "Index out of bounds: length == " + this.length + " and index = " + index
+  return this[index]
+}
+Array.prototype.XXSet = function(index, value) {
+  if (index < 0)
+    index += this.length
+  if (index < 0 || index >= this.length)
+    throw "Index out of bounds: length == " + this.length + " and index = " + index
+  this[index] = value
+  return value
+}
+
+Function.prototype.XXInspect = function() { return '[Function]' }
 
 var XXAssert = new Object()
 
@@ -293,12 +313,12 @@ def Parse(string, filename):
     elif Consume('\\', origin):
       args = []
       while not At('Newline') and not At('.'):
-        args.append(Expression())
+        args.append(PrimaryExpression())
         Consume(',')
       Consume('.')
       EatExpressionDelimiters()
       body = Expression()
-      return Node('Function', {'scoped': scoped}, [Node('Arguments', None, args, origin), body], origin)
+      return Node('Function', None, [Node('Arguments', None, args, origin), body], origin)
     elif Consume('(', origin):
       expr = Expression()
       Expect(')', None, None, origin)
@@ -347,13 +367,13 @@ def Parse(string, filename):
 
   def MultiplicativeExpression():
     expr = PostfixExpression()
-    if any(At(symbol) for symbol in ('*', '/', '%')):
+    while any(At(symbol) for symbol in ('*', '/', '%')):
       return Node('.%s.' % GetToken().type, None, [expr, PostfixExpression()], expr.origin)
     return expr
 
   def AdditiveExpression():
     expr = MultiplicativeExpression()
-    if any(At(symbol) for symbol in ('+', '-')):
+    while any(At(symbol) for symbol in ('+', '-')):
       return Node('.%s.' % GetToken().type, None, [expr, MultiplicativeExpression()], expr.origin)
     return expr
 
@@ -394,10 +414,10 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'while', 'if', '.<.', 'Block'):
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', '.<.', '.+.'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
-  elif node.type in ('.=.', '.+='):
+  elif node.type in ('.=.', '.+=.'):
     target, _ = node.children
     return FindAssigned(target)
   else:
@@ -431,7 +451,7 @@ def Translate(node, source=None):
   elif node.type == 'Function':
     args, body = node.children
     decls = GenerateDeclarations(FindDeclaredVariables(body))
-    return '(function(%s){%s%s;return XXNone})' % (decls, ','.join(map(Translate, args)), Translate(body))
+    return '(function(%s){%s%s;return XXNone})' % (','.join(map(Translate, args.children)), decls, Translate(body))
   elif node.type == 'Block':
     return '{' + ';'.join(map(Translate, node.children)) + '}'
   elif node.type == 'Attribute':
@@ -448,6 +468,8 @@ def Translate(node, source=None):
       return 'if((%s).XX__Bool__()){%s}' % tuple(map(Translate, node.children))
   elif node.type == 'while':
     return 'while((%s).XX__Bool__()){%s}' % tuple(map(Translate, node.children))
+  elif node.type == 'return':
+    return 'return %s' % tuple(map(Translate, node.children))
   elif node.type == '.+.':
     left, right = map(Translate, node.children)
     return '((%s).XX__Add__(%s))' % (left, right)

@@ -9,3 +9,5 @@ while i < 3
 	i = i + 1
 
 Assert.Equal(xs, [0, 1, 2])
+
+xs.Map(\x. return x + 1).Get(0).Print()
