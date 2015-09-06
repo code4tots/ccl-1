@@ -24,31 +24,54 @@ KEYWORDS = (
 NATIVE_PRELUDE = r"""'use strict';
 
 Object.prototype.XXString = function() { return this.XXInspect(); }
+Object.prototype.XX__Equal__ = function(other) { return this === other }
 Object.prototype.XX__Add__ = function(other) { return this + other }
 Object.prototype.XX__Subtract__ = function(other) { return this + other }
 Object.prototype.XXPrint = function() { return console.log(this.XXString()) }
 
 var XXNone = new Object(), XXTrue = true, XXFalse = false
 XXNone.XXInspect = function() { return 'None' }
+XXNone.XX__Bool__ = function() { return false }
 
 Boolean.prototype.XXInspect = function() { return this ? "True" : "False" }
+Boolean.prototype.XX__Bool__ = function() { return this }
 
 Number.prototype.XXInspect = function() { return this.toString() }
+Number.prototype.XX__LessThan__ = function(other) { return this < other }
+Number.prototype.XX__Bool__ = function() { return this !== 0 }
 
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
+String.prototype.XX__Bool__ = function() { return this.length !== 0 }
 
 Array.prototype.XXInspect = function() {
   var s = '['
   for (var i = 0; i < this.length; i++) {
     if (i > 0)
       s += ', '
-    s += XXGetAttribute(this[i], "Inspect")()
+    s += this[i].XXInspect()
   }
   s += ']'
   return s
 }
+Array.prototype.XX__Equal__ = function(other) {
+  if (this.length !== other.length)
+    return false
+  for (var i = 0; i < this.length; i++)
+    if (this[i] !== other[i])
+      return false
+  return true
+}
 Array.prototype.XXMap = function(f) { return this.map(f) }
+Array.prototype.XX__Bool__ = function() { return this.length !== 0 }
+Array.prototype.XXPush = function(x) { this.push(x); return this }
+
+var XXAssert = new Object()
+
+XXAssert.XXEqual = function(a, b) {
+  if (!a.XX__Equal__(b))
+    throw "Expected equal, but weren't: left = " + a.XXInspect() + " right = " + b.XXInspect()
+}
 
 """
 
@@ -209,6 +232,7 @@ def Parse(string, filename):
     .<=.
     .>.
     .>=.
+
     .=.   # Assignment
     .+=.
     .-=.
@@ -261,7 +285,7 @@ def Parse(string, filename):
     origin = [None]
     if At('Name') or At('String') or At('Number'):
       return MakeNodeFromToken(GetToken())
-    elif At('[', origin):
+    elif Consume('[', origin):
       exprs = []
       while not Consume(']'):
         exprs.append(Expression())
@@ -322,8 +346,26 @@ def Parse(string, filename):
         break
     return expr
 
-  def AssignExpression():
+  def MultiplicativeExpression():
     expr = PostfixExpression()
+    if any(At(symbol) for symbol in ('*', '/', '%')):
+      return Node('.%s.' % GetToken().type, None, [expr, PostfixExpression()], expr.origin)
+    return expr
+
+  def AdditiveExpression():
+    expr = MultiplicativeExpression()
+    if any(At(symbol) for symbol in ('+', '-')):
+      return Node('.%s.' % GetToken().type, None, [expr, MultiplicativeExpression()], expr.origin)
+    return expr
+
+  def CompareExpression():
+    expr = AdditiveExpression()
+    if any(At(symbol) for symbol in ('<', '==')):
+      return Node('.%s.' % GetToken().type, None, [expr, AdditiveExpression()], expr.origin)
+    return expr
+
+  def AssignExpression():
+    expr = CompareExpression()
     if Consume('='):
       return Node('.=.', None, [expr, AssignExpression()], expr.origin)
     return expr
@@ -353,15 +395,20 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type == 'List':
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'while', 'if', '.<.', 'Block'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
-  elif node.type == '.=.':
+  elif node.type in ('.=.', '.+='):
     target, _ = node.children
     return FindAssigned(target)
   else:
     raise TypeError(node.type, node)
   return variables
+
+def GenerateDeclarations(names):
+  if names:
+    return 'var %s;' % ','.join('XX' + name for name in names)
+  return ''
 
 def Translate(node, source=None):
   if isinstance(node, str):
@@ -370,7 +417,10 @@ def Translate(node, source=None):
     return Translate(Parse(node, source))
 
   if node.type == 'Module':
-    return NATIVE_PRELUDE + ';' + ';'.join(map(Translate, node.children))
+    names = set()
+    for child in node.children:
+      names |= FindDeclaredVariables(child)
+    return NATIVE_PRELUDE + ';' + GenerateDeclarations(names) + ';'.join(map(Translate, node.children))
   elif node.type == 'Name':
     return 'XX' + node.value
   elif node.type == 'Number':
@@ -381,8 +431,8 @@ def Translate(node, source=None):
     return '[%s]' % ','.join(map(Translate, node.children))
   elif node.type == 'Function':
     args, body = node.children
-    decls = FindDeclaredVariables(body)
-    return '(function(%s){var %s;%s;return XXNone})' % (','.join(decls), ','.join(map(Translate, args)), Translate(body))
+    decls = GenerateDeclarations(FindDeclaredVariables(body))
+    return '(function(%s){%s%s;return XXNone})' % (decls, ','.join(map(Translate, args)), Translate(body))
   elif node.type == 'Block':
     return '{' + ';'.join(map(Translate, node.children)) + '}'
   elif node.type == 'Attribute':
@@ -391,17 +441,28 @@ def Translate(node, source=None):
     f, args = node.children
     return '((%s)(%s))' % (Translate(f), Translate(args))
   elif node.type == 'Subscript':
-    return '((%s).__XXGetItem__'
+    return '((%s).XX__GetItem__'
   elif node.type == 'Arguments':
     return ','.join(map(Translate, node.children))
   elif node.type == 'if':
     if len(node.children) == 3:
-      return 'if((%s).__XXBool__()){%s}else{%s}' % tuple(node.children)
+      return 'if((%s).XX__Bool__()){%s}else{%s}' % tuple(map(Translate, node.children))
     else:
-      return 'if((%s).__XXBool__()){%s}' % tuple(node.children)
+      return 'if((%s).XX__Bool__()){%s}' % tuple(map(Translate, node.children))
   elif node.type == 'while':
-    return 'while((%s).__XXBool__()){%s}' % tuple(node.children)
-
+    return 'while((%s).XX__Bool__()){%s}' % tuple(map(Translate, node.children))
+  elif node.type == '.+.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Add__(%s))' % (left, right)
+  elif node.type == '.==.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Equal__(%s))' % (left, right)
+  elif node.type == '.=.':
+    left, right = map(Translate, node.children)
+    return '((%s)%s(%s))' % (left, node.type[1:-1], right)
+  elif node.type == '.<.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__LessThan__(%s))' % (left, right)
   raise TypeError('Unrecognized node type %s' % node.type)
 
 

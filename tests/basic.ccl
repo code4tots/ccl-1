@@ -1,1 +1,11 @@
-'hi'.Print()
+Assert.Equal(5, 5)
+Assert.Equal([5], [5])
+Assert.Equal('hi'.Inspect(), '"hi"')
+
+xs = []
+i = 0
+while i < 3
+	xs.Push(i)
+	i = i + 1
+
+Assert.Equal(xs, [0, 1, 2])
