@@ -1,1 +1,0 @@
-Assert((5).__Type__() is 'Number', "(5).__Type__() is not 'Number'?")
