@@ -210,7 +210,6 @@ def Parse(string, filename):
     Block
     Attribute
     Call
-    Subscript
 
     if
     while
@@ -380,7 +379,7 @@ def Parse(string, filename):
 
 def FindAssigned(node):
   variables = set()
-  if node.type in ('Attribute', 'Subscript'):
+  if node.type in ('Attribute',):
     pass
   elif node.type == 'List':
     for child in node.children:
@@ -440,8 +439,6 @@ def Translate(node, source=None):
   elif node.type == 'Call':
     f, args = node.children
     return '((%s)(%s))' % (Translate(f), Translate(args))
-  elif node.type == 'Subscript':
-    return '((%s).XX__GetItem__'
   elif node.type == 'Arguments':
     return ','.join(map(Translate, node.children))
   elif node.type == 'if':
