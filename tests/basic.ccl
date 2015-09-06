@@ -10,4 +10,6 @@ while i < 3
 
 Assert.Equal(xs, [0, 1, 2])
 
-xs.Map(\x. return x + 1).Get(0).Print()
+Assert.Equal(
+	xs.Map(\x. return x + 3),
+	[3, 4, 5])
