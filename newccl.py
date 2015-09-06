@@ -399,6 +399,8 @@ def Translate(node, source=None):
       return 'if((%s).__XXBool__()){%s}else{%s}' % tuple(node.children)
     else:
       return 'if((%s).__XXBool__()){%s}' % tuple(node.children)
+  elif node.type == 'while':
+    return 'while((%s).__XXBool__()){%s}' % tuple(node.children)
 
   raise TypeError('Unrecognized node type %s' % node.type)
 
