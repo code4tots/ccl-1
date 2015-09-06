@@ -1,36 +1,58 @@
+## Goals
+
+Goal of this project is to implement something basic I can port to multiple platforms.
+
+That is, a language whose AST is simple enough that I can write a good chunk of code in this one language, and expect to use it for a variety of projects (e.g. Android, iOS, Web, desktop).
+
+Right now there is only a nodejs backend.
+
+Once the language is mature enough, I might consider porting to other languages.
 
 ## Grammar
 
-Module
-  expressions: [Expression]
-  variables: [str]
+    Module
 
-Block: Expression
-  expressions: [Expression]
+    Name
+    Number
+    String
+    List
+    Function
+    Block
+    Attribute
+    Call
+    Subscript
 
-LookupVariable: Expression
-  name: str
+    if
+    while
+    return
 
-Number: Expression
-  value: int|float
+    Arguments # Only found as first child of Function and second child of Call nodes.
 
-String: Expression
-  value: str
+    +.
+    -.
+    .+.
+    .-.
+    .*.
+    ./.
+    .%.
+    .or.
+    .and.
+    .==.
+    .<.
+    .<=.
+    .>.
+    .>=.
 
-List: Expression
-  value: [Expression]
-
-Function: Expression
-  body: Expression
-  variables: [str]
-
-Call: Expression
-  function: Expression
-  arguments: [Expression]
-
-Assign: Expression
-  target: str
-  value: Expression
+    .=.   # Assignment
+    .+=.
+    .-=.
+    .*=.
+    ./=.
+    .%=.
+    .++
+    .--
+    ++.
+    --.
 
 ## Builtins
 
