@@ -233,6 +233,7 @@ def Parse(string, filename):
     Attribute
     Call
 
+    is
     if
     while
     return
@@ -381,6 +382,8 @@ def Parse(string, filename):
 
   def CompareExpression():
     expr = AdditiveExpression()
+    if Consume('is'):
+      return Node('is', None, [expr, AdditiveExpression()], expr.origin)
     if any(At(symbol) for symbol in ('<', '==')):
       return Node('.%s.' % GetToken().type, None, [expr, AdditiveExpression()], expr.origin)
     return expr
@@ -463,6 +466,8 @@ def Translate(node, source=None):
     return '((%s)(%s))' % (Translate(f), Translate(args))
   elif node.type == 'Arguments':
     return ','.join(map(Translate, node.children))
+  elif node.type == 'is':
+    return '((%s)===(%s))' % tuple(map(Translate, node.children))
   elif node.type == 'if':
     if len(node.children) == 3:
       return 'if((%s).XX__Bool__()){%s}else{%s}' % tuple(map(Translate, node.children))
