@@ -1,6 +1,4 @@
-numbers = Read().SplitWords().Slice(1).Map(\word. word.Int())
-
-numbers.GroupBy(2).Each() \ ab
+Read().SplitWords().Slice(1).Map(\word. word.Int()).GroupBy(2).Each() \ ab
 	a = ab.Get(0)
 	b = ab.Get(1)
 	(a + b).Print()
