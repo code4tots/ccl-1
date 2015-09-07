@@ -76,6 +76,7 @@ Number.prototype.XXInspect = function() { return this.toString() }
 Number.prototype.XX__Bool__ = function() { return this !== 0 }
 Number.prototype.XXFloor = function() { return Math.floor(this) }
 Number.prototype.XXSquareRoot = function() { return Math.sqrt(this) }
+Number.prototype.XX__Negate__ = function() { return -this }
 
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
@@ -87,6 +88,7 @@ String.prototype.XXFoldLeft = FoldLeft
 String.prototype.XXReduce = Reduce
 String.prototype.XXInt = function() { return parseInt(this) }
 String.prototype.XXSize = function() { return this.length }
+String.prototype.XXStrip = function() { return this.replace(/^\s+|\s+$/g, '') }
 
 Array.prototype.XXInspect = function() {
   var s = '['
@@ -426,6 +428,8 @@ def Parse(string, filename):
       if Consume('else'):
         EatExpressionDelimiters()
         exprs.append(Expression()) # else
+      elif Peek(-1).type in (';', 'Newline'): # TODO: Find more elegant solution.
+        i[0] -= 1
       return Node('if', None, exprs, origin)
     elif Consume('while', origin):
       exprs = [Expression()] # test
@@ -453,10 +457,16 @@ def Parse(string, filename):
         break
     return expr
 
+  def PrefixExpression():
+    origin = [None]
+    if Consume('-', origin):
+      return Node('-.', None, [PrefixExpression()], origin)
+    return PostfixExpression()
+
   def MultiplicativeExpression():
-    expr = PostfixExpression()
+    expr = PrefixExpression()
     while any(At(symbol) for symbol in ('*', '/', '%')):
-      return Node('.%s.' % GetToken().type, None, [expr, PostfixExpression()], expr.origin)
+      return Node('.%s.' % GetToken().type, None, [expr, PrefixExpression()], expr.origin)
     return expr
 
   def AdditiveExpression():
@@ -516,7 +526,7 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.and.', '.or.', '.<.', '.<=.', '.>.', '.>=.', '.==.', '.+.', '.-.', '.*.', './.', '.%.'):
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.and.', '.or.', '.<.', '.<=.', '.>.', '.>=.', '.==.', '.+.', '.-.', '.*.', './.', '.%.', '-.'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
   elif node.type in ('.=.', '.+=.'):
@@ -574,6 +584,9 @@ def Translate(node, source=None):
     return 'while((%s).XX__Bool__()){%s}' % tuple(map(Translate, node.children))
   elif node.type == 'return':
     return 'return %s' % tuple(map(Translate, node.children))
+  elif node.type == '-.':
+    child, = map(Translate, node.children)
+    return '((%s).XX__Negate__())'% (child,)
   elif node.type == '.+.':
     left, right = map(Translate, node.children)
     return '((%s).XX__Add__(%s))' % (left, right)

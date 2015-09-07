@@ -1,19 +1,17 @@
-input = Strip(Read())
+input = Read().Strip()
+hour = input.Slice(0, 2).Int()
+rest = input.Slice(2, -2)
+suffix = input.Slice(-2, 0)
 
-hour = Int(input[:2])
-rest = input[2:Size('xx:xx:xx')]
-suffix = input[-2:]
-
-if hour == 12 and suffix == 'AM'
+if hour is 12 and suffix is 'AM'
 	hour = 0
-else if hour == 12 and suffix == 'PM'
+else if hour is 12 and suffix is 'PM'
 	hour = 12
-else if suffix == 'PM'
+else if suffix is 'PM'
 	hour = hour + 12
 
-if hour < 10
-	hour = '0' + String(hour)
-else
-	hour = String(hour)
+hour = hour.String()
+if hour.Size() is 1
+	hour = '0' + hour
 
-Print(hour + rest)
+(hour + rest).Print()
