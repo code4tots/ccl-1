@@ -8,6 +8,16 @@ Right now there is only a nodejs backend.
 
 Once the language is mature enough, I might consider porting to other languages.
 
+## On the fence
+
+About implementing destructuring assignment.
+
+The translator currently translates to javascript in a way such that destructuring assignment is supported iff it is supported in the underlying javascript implementation (it's part of ES6 standard, but node doesn't seem to support it yet).
+
+A portable implementation would add a certain level of complexity...
+
+Also, I don't want syntactic translations to create functions where user hasn't created any, due to the way variable declarations are deduced. Making things work nicely will be a lot more work and add a good deal of complexity to the code.
+
 ## Grammar
 
     Module
