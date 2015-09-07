@@ -1,11 +1,20 @@
-# lines = SplitLines(Read())
-# i = 1
-# while i < Size(lines)
-# 	[N, K] = Map(Int, Split(lines[i]))
-# 	a = Map(Int, Split(lines[i+1]))
-# 	total = FoldLeft(\total x. if x <= 0; total+1 else total, 0, a)
-# 	Print(if total < K; "YES" else "NO")
-# 	i = i+2
+lines = Read().SplitLines()
+i = 1
+while i < lines.Size()
+	NK = lines.Get(i).SplitWords().Map(\word. return word.Int())
+	N = NK.Get(0)
+	K = NK.Get(1)
+	a = lines.Get(i+1).SplitWords().Map(\word. return word.Int())
 
-Read().SplitLines()[1:].Map(.SplitWords() * .Map(.Int())).GroupBy(2).Map(\a b. a + b).Each() \ [N, K, a...]
-	(if a.Reduce(\total x. if x <= 0; total+1 else total) < K; "YES" else "NO").Print()
+	total = 0
+	j = 0
+	while j < a.Size()
+		if a.Get(j) <= 0
+			total = total + 1
+		j = j + 1
+
+	if total < K
+		"YES".Print()
+	else
+		"NO".Print()
+	i = i + 2

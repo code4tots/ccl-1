@@ -60,6 +60,8 @@ Object.prototype.XX__Multiply__ = function(other) { return this * other }
 Object.prototype.XX__Divide__ = function(other) { return this / other }
 Object.prototype.XX__Modulo__ = function(other) { return this % other }
 Object.prototype.XXPrint = function() { return console.log(this.XXString()) }
+Object.prototype.XX__LessThan__ = function(other) { return this < other }
+Object.prototype.XX__LessThanOrEqual__ = function(other){ return this.XX__Equal__(other) || this.XX__LessThan__(other) }
 
 var XXNone = new Object(), XXTrue = true, XXFalse = false
 XXNone.XXInspect = function() { return 'None' }
@@ -69,18 +71,18 @@ Boolean.prototype.XXInspect = function() { return this ? "True" : "False" }
 Boolean.prototype.XX__Bool__ = function() { return this }
 
 Number.prototype.XXInspect = function() { return this.toString() }
-Number.prototype.XX__LessThan__ = function(other) { return this < other }
 Number.prototype.XX__Bool__ = function() { return this !== 0 }
 
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
 String.prototype.XX__Bool__ = function() { return this.length !== 0 }
 String.prototype.XXSplitWords = function() { return this.split(/\s+/).filter(function(x) { return x !== '' }) }
-String.prototype.XXSplitlines = function() { return this.split(/\n+/).filter(function(x) { return x !== '' }) }
+String.prototype.XXSplitLines = function() { return this.split(/\n+/).filter(function(x) { return x !== '' }) }
 String.prototype.XXSlice = Slice
 String.prototype.XXFoldLeft = FoldLeft
 String.prototype.XXReduce = Reduce
 String.prototype.XXInt = function() { return parseInt(this) }
+String.prototype.XXSize = function() { return this.length }
 
 Array.prototype.XXInspect = function() {
   var s = '['
@@ -121,6 +123,7 @@ Array.prototype.XXSet = function(index, value) {
 Array.prototype.XXSlice = Slice
 Array.prototype.XXFoldLeft = FoldLeft
 Array.prototype.XXReduce = Reduce
+Array.prototype.XXSize = function() { return this.length }
 
 
 Function.prototype.XXInspect = function() { return '[Function]' }
@@ -430,7 +433,7 @@ def Parse(string, filename):
     expr = AdditiveExpression()
     if Consume('is'):
       return Node('is', None, [expr, AdditiveExpression()], expr.origin)
-    if any(At(symbol) for symbol in ('<', '==')):
+    if any(At(symbol) for symbol in ('<', '<=', '>', '>=', '==')):
       return Node('.%s.' % GetToken().type, None, [expr, AdditiveExpression()], expr.origin)
     return expr
 
@@ -465,7 +468,7 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.<.', '.+.'):
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.<.', '.<=.', '.+.'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
   elif node.type in ('.=.', '.+=.'):
@@ -535,6 +538,9 @@ def Translate(node, source=None):
   elif node.type == '.<.':
     left, right = map(Translate, node.children)
     return '((%s).XX__LessThan__(%s))' % (left, right)
+  elif node.type == '.<=.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__LessThanOrEqual__(%s))' % (left, right)
   raise TypeError('Unrecognized node type %s' % node.type)
 
 
