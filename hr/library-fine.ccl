@@ -1,4 +1,4 @@
-lines = Read().SplitLines().Map(\line. return line.SplitWords().Map(\word. return word.Int()))
+lines = Read().SplitLines().Map(\line. line.SplitWords().Map(\word. word.Int()))
 actual_day = lines.Get(0).Get(0)
 actual_month = lines.Get(0).Get(1)
 actual_year = lines.Get(0).Get(2)

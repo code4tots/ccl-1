@@ -390,9 +390,12 @@ def Parse(string, filename):
       while not At('Newline') and not At('.'):
         args.append(PrimaryExpression())
         Consume(',')
-      Consume('.')
-      EatExpressionDelimiters()
-      body = Expression()
+      dot_origin = [None]
+      if Consume('.', dot_origin):
+        body = Node('return', None, [Expression()], dot_origin)
+      else:
+        EatExpressionDelimiters()
+        body = Expression()
       return Node('Function', None, [Node('Arguments', None, args, origin), body], origin)
     elif Consume('(', origin):
       expr = Expression()
