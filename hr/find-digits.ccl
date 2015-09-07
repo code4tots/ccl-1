@@ -1,2 +1,18 @@
-For(Map(Int, Split(Read()))[1:]) \ N
-	Print(Reduce(Add, Map(\digit. if N % Int(digit) == 0; 1 else 0, String(N))))
+NS = Read().SplitWords().Slice(1)
+
+i = 0
+while i < NS.Size()
+	total = 0
+
+	X = N = NS.Get(i)
+	while X > 0
+		digit = X % 10
+
+		if N % digit is 0
+			total = total + 1
+
+		X = (X / 10).Floor()
+
+	total.Print()
+
+	i = i + 1

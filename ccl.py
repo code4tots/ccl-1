@@ -8,7 +8,7 @@ Node = collections.namedtuple('Node', 'type value children origin')
 SYMBOLS = (
     '\\', '.', '...',
     ':',
-    '+', '-', '*', '%',
+    '+', '-', '*', '/', '%',
     '(', ')', '[', ']', ',', '=',
     '==', '<', '>', '<=', '>=', '!=',
     ';',
@@ -62,6 +62,8 @@ Object.prototype.XX__Modulo__ = function(other) { return this % other }
 Object.prototype.XXPrint = function() { return console.log(this.XXString()) }
 Object.prototype.XX__LessThan__ = function(other) { return this < other }
 Object.prototype.XX__LessThanOrEqual__ = function(other){ return this.XX__Equal__(other) || this.XX__LessThan__(other) }
+Object.prototype.XX__GreaterThan__ = function(other){ return !this.XX__LessThanOrEqual__(other) }
+Object.prototype.XX__GreaterThanOrEqual__ = function(other){ return !this.XX__LessThan__(other) }
 
 var XXNone = new Object(), XXTrue = true, XXFalse = false
 XXNone.XXInspect = function() { return 'None' }
@@ -72,6 +74,7 @@ Boolean.prototype.XX__Bool__ = function() { return this }
 
 Number.prototype.XXInspect = function() { return this.toString() }
 Number.prototype.XX__Bool__ = function() { return this !== 0 }
+Number.prototype.XXFloor = function() { return Math.floor(this) }
 
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
@@ -468,12 +471,12 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.<.', '.<=.', '.+.'):
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.<.', '.<=.', '.>.', '.>=.', '.==.', '.+.', '.-', '.*.', './.', '.%.'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
   elif node.type in ('.=.', '.+=.'):
-    target, _ = node.children
-    return FindAssigned(target)
+    target, value = node.children
+    return FindAssigned(target) | FindDeclaredVariables(value)
   else:
     raise TypeError(node.type, node)
   return variables
@@ -529,6 +532,18 @@ def Translate(node, source=None):
   elif node.type == '.+.':
     left, right = map(Translate, node.children)
     return '((%s).XX__Add__(%s))' % (left, right)
+  elif node.type == '.-.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Subtract__(%s))' % (left, right)
+  elif node.type == '.*.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Multiply__(%s))' % (left, right)
+  elif node.type == './.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Divide__(%s))' % (left, right)
+  elif node.type == '.%.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Modulo__(%s))' % (left, right)
   elif node.type == '.==.':
     left, right = map(Translate, node.children)
     return '((%s).XX__Equal__(%s))' % (left, right)
@@ -541,6 +556,12 @@ def Translate(node, source=None):
   elif node.type == '.<=.':
     left, right = map(Translate, node.children)
     return '((%s).XX__LessThanOrEqual__(%s))' % (left, right)
+  elif node.type == '.>.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__GreaterThan__(%s))' % (left, right)
+  elif node.type == '.<=.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__GreaterThanOrEqual__(%s))' % (left, right)
   raise TypeError('Unrecognized node type %s' % node.type)
 
 
