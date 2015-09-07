@@ -1,10 +1,16 @@
-[[actual_day, actual_month, actual_year], [expected_day, expected_month, expected_year]] = Map(\line . Map(Int, Split(line)), SplitLines(Read()))
+lines = Read().SplitLines().Map(\line. return line.SplitWords().Map(\word. return word.Int()))
+actual_day = lines.Get(0).Get(0)
+actual_month = lines.Get(0).Get(1)
+actual_year = lines.Get(0).Get(2)
+expected_day = lines.Get(1).Get(0)
+expected_month = lines.Get(1).Get(1)
+expected_year = lines.Get(1).Get(2)
 
 if actual_year < expected_year or actual_year == expected_year and actual_month < expected_month or actual_year == expected_year and actual_month == expected_month and actual_day <= expected_day
-	Print(0)
+	(0).Print()
 else if actual_month == expected_month and actual_year == expected_year
-	Print(Multiply(15, Subtract(actual_day, expected_day)))
+	(15 * (actual_day - expected_day)).Print()
 else if actual_year == expected_year
-	Print(Multiply(500, Subtract(actual_month, expected_month)))
+	(500 * (actual_month - expected_month)).Print()
 else
-	Print(10000)
+	(10000).Print()

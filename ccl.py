@@ -18,6 +18,7 @@ KEYWORDS = (
     'is',
     'while',
     'if', 'else',
+    'and', 'or',
     'return',
 )
 
@@ -286,6 +287,8 @@ def Parse(string, filename):
     Call
 
     is
+    and
+    or
     if
     while
     return
@@ -440,8 +443,20 @@ def Parse(string, filename):
       return Node('.%s.' % GetToken().type, None, [expr, AdditiveExpression()], expr.origin)
     return expr
 
-  def AssignExpression():
+  def AndExpression():
     expr = CompareExpression()
+    while Consume('and'):
+      expr = Node('.and.', None, [expr, CompareExpression()], expr.origin)
+    return expr
+
+  def OrExpression():
+    expr = AndExpression()
+    while Consume('or'):
+      expr = Node('.or.', None, [expr, AndExpression()], expr.origin)
+    return expr
+
+  def AssignExpression():
+    expr = OrExpression()
     if Consume('='):
       return Node('.=.', None, [expr, AssignExpression()], expr.origin)
     return expr
@@ -471,7 +486,7 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.<.', '.<=.', '.>.', '.>=.', '.==.', '.+.', '.-', '.*.', './.', '.%.'):
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.and.', '.or.', '.<.', '.<=.', '.>.', '.>=.', '.==.', '.+.', '.-.', '.*.', './.', '.%.'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
   elif node.type in ('.=.', '.+=.'):
@@ -562,6 +577,12 @@ def Translate(node, source=None):
   elif node.type == '.<=.':
     left, right = map(Translate, node.children)
     return '((%s).XX__GreaterThanOrEqual__(%s))' % (left, right)
+  elif node.type == '.and.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Bool__()&&(%s).XX__Bool__())' % (left, right)
+  elif node.type == '.or.':
+    left, right = map(Translate, node.children)
+    return '((%s).XX__Bool__()||(%s).XX__Bool__())' % (left, right)
   raise TypeError('Unrecognized node type %s' % node.type)
 
 
