@@ -1,0 +1,39 @@
+convert = \string
+	input = string.Strip()
+	hour = input.Slice(0, 2).Int()
+	rest = input.Slice(2, -2)
+	suffix = input.Slice(-2, 0)
+
+	if hour is 12 and suffix is 'AM'
+		hour = 0
+	else if hour is 12 and suffix is 'PM'
+		hour = 12
+	else if suffix is 'PM'
+		hour = hour + 12
+
+	hour = hour.String()
+	if hour.Size() is 1
+		hour = '0' + hour
+
+	return hour + rest
+
+
+Assert.Equal(
+	"19:05:45",
+	convert("07:05:45PM"))
+
+Assert.Equal(
+	"12:05:45",
+	convert("12:05:45PM"))
+
+Assert.Equal(
+	"00:05:45",
+	convert("12:05:45AM"))
+
+Assert.Equal(
+	"00:00:00",
+	convert("12:00:00AM"))
+
+Assert.Equal(
+	"12:00:00",
+	convert("12:00:00PM"))
