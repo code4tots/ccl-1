@@ -77,6 +77,7 @@ Number.prototype.XX__Bool__ = function() { return this !== 0 }
 Number.prototype.XXFloor = function() { return Math.floor(this) }
 Number.prototype.XXSquareRoot = function() { return Math.sqrt(this) }
 Number.prototype.XX__Negate__ = function() { return -this }
+Number.prototype.XXAbsoluteValue = function() { return Math.abs(this) }
 
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
@@ -466,13 +467,13 @@ def Parse(string, filename):
   def MultiplicativeExpression():
     expr = PrefixExpression()
     while any(At(symbol) for symbol in ('*', '/', '%')):
-      return Node('.%s.' % GetToken().type, None, [expr, PrefixExpression()], expr.origin)
+      expr = Node('.%s.' % GetToken().type, None, [expr, PrefixExpression()], expr.origin)
     return expr
 
   def AdditiveExpression():
     expr = MultiplicativeExpression()
     while any(At(symbol) for symbol in ('+', '-')):
-      return Node('.%s.' % GetToken().type, None, [expr, MultiplicativeExpression()], expr.origin)
+      expr = Node('.%s.' % GetToken().type, None, [expr, MultiplicativeExpression()], expr.origin)
     return expr
 
   def CompareExpression():

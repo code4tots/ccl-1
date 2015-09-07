@@ -1,0 +1,10 @@
+matrix = Read().SplitLines().Slice(1).Map(\line. line.SplitWords().Map(\word. word.Int()))
+N = matrix.Size()
+
+i = d1 = d2 = 0
+while i < N
+	d1 = d1 + matrix.Get(i).Get(i)
+	d2 = d2 + matrix.Get(i).Get(N-1-i)
+	i = i + 1
+
+(d1-d2).AbsoluteValue().Print()
