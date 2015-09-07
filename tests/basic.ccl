@@ -26,3 +26,4 @@ Assert.Equal(
 	Thing().SayHello(),
 	"hello world!")
 
+Assert.True(1 is 1, "1 is 1")

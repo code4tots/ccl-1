@@ -90,6 +90,11 @@ var XXCreate = function(x) { return Object.create(x === undefined ? null : x) }
 
 var XXAssert = new Object()
 
+XXAssert.XXTrue = function(x, message) {
+  if (!x.XX__Bool__())
+    throw "Failed assertion: " + (message ? message : "")
+}
+
 XXAssert.XXEqual = function(a, b) {
   if (!a.XX__Equal__(b))
     throw "Expected equal, but weren't: left = " + a.XXInspect() + " right = " + b.XXInspect()
@@ -419,7 +424,7 @@ def FindDeclaredVariables(node):
   variables = set()
   if node.type in ('Name', 'Number', 'String', 'Function'):
     pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', '.<.', '.+.'):
+  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.<.', '.+.'):
     for child in node.children:
       variables |= FindDeclaredVariables(child)
   elif node.type in ('.=.', '.+=.'):
