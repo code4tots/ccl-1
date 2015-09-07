@@ -1,1 +1,1 @@
-Print(Reduce(Add, Map(Int, Slice(Split(Read()), 1))))
+Read().SplitWords().Slice(1).Map(\word. word.Int()).Reduce(\a b. a + b).Print()
