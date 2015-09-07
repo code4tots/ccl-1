@@ -89,17 +89,19 @@ Function.prototype.XXInspect = function() { return '[Function]' }
 var XXCreate = function(x) { return Object.create(x === undefined ? null : x) }
 
 var XXAssert = new Object()
-
 XXAssert.XXTrue = function(x, message) {
   if (!x.XX__Bool__())
     throw "Failed assertion: " + (message ? message : "")
 }
-
 XXAssert.XXEqual = function(a, b) {
   if (!a.XX__Equal__(b))
     throw "Expected equal, but weren't: left = " + a.XXInspect() + " right = " + b.XXInspect()
 }
 
+function XXRead() {
+  // TODO: Find more portable but still synchronous solution.
+  return require('fs').readFileSync('/dev/stdin').toString()
+}
 """
 
 PRELUDE = r"""
