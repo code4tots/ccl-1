@@ -23,6 +23,35 @@ KEYWORDS = (
 
 NATIVE_PRELUDE = r"""'use strict';
 
+function Slice(lower, upper, step) {
+  if (lower === undefined || lower == XXNone) lower = 0
+  if (upper === undefined || upper == XXNone) upper = this.length
+  if (step === undefined || step == XXNone) step = 1
+  if (lower < 0)
+    lower += this.length
+  if (upper <= 0)
+    upper += this.length
+  if (step !== 1)
+    throw "Non-unit step slicing not yet supported: " + step
+  return this.slice(lower, upper)
+}
+
+function FoldLeft(init, f) {
+  for (var i = 0; i < this.length; i++)
+    init = f(init, this[i])
+  return init
+}
+
+function Reduce(f) {
+  if (this.length < 1)
+    throw "Reduce requires an iterable with at least one element"
+  var init = this[0]
+  for (var i = 1; i < this.length; i++)
+    init = f(init, this[i])
+  return init
+}
+
+
 Object.prototype.XXString = function() { return this.XXInspect(); }
 Object.prototype.XX__Equal__ = function(other) { return this === other }
 Object.prototype.XX__Add__ = function(other) { return this + other }
@@ -46,6 +75,12 @@ Number.prototype.XX__Bool__ = function() { return this !== 0 }
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
 String.prototype.XX__Bool__ = function() { return this.length !== 0 }
+String.prototype.XXSplitWords = function() { return this.split(/\s+/).filter(function(x) { return x !== '' }) }
+String.prototype.XXSplitlines = function() { return this.split(/\n+/).filter(function(x) { return x !== '' }) }
+String.prototype.XXSlice = Slice
+String.prototype.XXFoldLeft = FoldLeft
+String.prototype.XXReduce = Reduce
+String.prototype.XXInt = function() { return parseInt(this) }
 
 Array.prototype.XXInspect = function() {
   var s = '['
@@ -83,6 +118,10 @@ Array.prototype.XXSet = function(index, value) {
   this[index] = value
   return value
 }
+Array.prototype.XXSlice = Slice
+Array.prototype.XXFoldLeft = FoldLeft
+Array.prototype.XXReduce = Reduce
+
 
 Function.prototype.XXInspect = function() { return '[Function]' }
 

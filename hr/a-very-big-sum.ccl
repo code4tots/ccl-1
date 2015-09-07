@@ -1,1 +1,1 @@
-Read().SplitWords()[1:].Map(\x. x.Int()).Reduce(\a b. a + b).Print()
+Read().SplitWords().Slice(1, None, None).Map(\x. return x.Int()).Reduce(\a b. return a + b).Print()
