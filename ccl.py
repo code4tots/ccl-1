@@ -52,7 +52,6 @@ function Reduce(f) {
   return init
 }
 
-
 Object.prototype.XXString = function() { return this.XXInspect(); }
 Object.prototype.XX__Equal__ = function(other) { return this === other }
 Object.prototype.XX__Add__ = function(other) { return this + other }
@@ -145,6 +144,17 @@ Array.prototype.XXEach = function(f) {
   for (var i = 0; i < this.length; i++) {
     f(this[i])
   }
+}
+Array.prototype.XXGroupBy = function(n) {
+  var ret = [], vals = []
+  for (var i = 0; i < this.length; i++) {
+    vals.push(this[i])
+    if (vals.length === n) {
+      ret.push(vals)
+      vals = []
+    }
+  }
+  return ret
 }
 
 Function.prototype.XXInspect = function() { return '[Function]' }
