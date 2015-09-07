@@ -37,11 +37,17 @@ function Slice(lower, upper, step) {
   return this.slice(lower, upper)
 }
 
+function Filter(f) {
+  return this.filter(f)
+}
+
 function FoldLeft(init, f) {
   for (var i = 0; i < this.length; i++)
     init = f(init, this[i])
   return init
 }
+
+var Fold = FoldLeft
 
 function Reduce(f) {
   if (this.length < 1)
@@ -85,7 +91,9 @@ String.prototype.XX__Bool__ = function() { return this.length !== 0 }
 String.prototype.XXSplitWords = function() { return this.split(/\s+/).filter(function(x) { return x !== '' }) }
 String.prototype.XXSplitLines = function() { return this.split(/\n+/).filter(function(x) { return x !== '' }) }
 String.prototype.XXSlice = Slice
+String.prototype.XXFilter = Filter
 String.prototype.XXFoldLeft = FoldLeft
+String.prototype.XXFold = Fold
 String.prototype.XXReduce = Reduce
 String.prototype.XXInt = function() { return parseInt(this) }
 String.prototype.XXSize = function() { return this.length }
@@ -140,7 +148,9 @@ Array.prototype.XXSet = function(index, value) {
   return value
 }
 Array.prototype.XXSlice = Slice
+Array.prototype.XXFilter = Filter
 Array.prototype.XXFoldLeft = FoldLeft
+Array.prototype.XXFold = Fold
 Array.prototype.XXReduce = Reduce
 Array.prototype.XXSize = function() { return this.length }
 Array.prototype.XXEach = function(f) {

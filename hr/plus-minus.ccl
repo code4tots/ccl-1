@@ -1,0 +1,8 @@
+A = Read().SplitWords().Slice(1).Map(\word. word.Int())
+total = A.Size()
+gt = A.Filter(\a. a >  0).Size()
+lt = A.Filter(\a. a <  0).Size()
+eq = A.Filter(\a. a is 0).Size()
+(gt / total).Print()
+(lt / total).Print()
+(eq / total).Print()
