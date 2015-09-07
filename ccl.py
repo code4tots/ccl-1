@@ -349,16 +349,7 @@ def Parse(string, filename):
     .>.
     .>=.
 
-    .=.   # Assignment
-    .+=.
-    .-=.
-    .*=.
-    ./=.
-    .%=.
-    .++
-    .--
-    ++.
-    --.
+    .=.
 
   """
   toks = Lex(string, filename)
