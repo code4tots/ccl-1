@@ -86,6 +86,8 @@ Array.prototype.XXSet = function(index, value) {
 
 Function.prototype.XXInspect = function() { return '[Function]' }
 
+var XXCreate = function(x) { return Object.create(x === undefined ? null : x) }
+
 var XXAssert = new Object()
 
 XXAssert.XXEqual = function(a, b) {
