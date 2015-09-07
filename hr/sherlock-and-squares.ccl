@@ -1,2 +1,4 @@
-For(Map(\line. Map(Int, Split(line)), SplitLines(Read())[1:])) \ AB
-  Print(-Reduce(Subtract, Map(\x. Floor(SquareRoot(x)), [AB[0]-1, AB[1]])))
+Read().SplitLines().Slice(1).Map(\line. return line.SplitWords().Map(\word. return word.Int())).Each() \AB
+	A = AB.Get(0)
+	B = AB.Get(1)
+	(B.SquareRoot().Floor() - (A-1).SquareRoot().Floor()).Print()

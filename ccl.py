@@ -62,9 +62,9 @@ Object.prototype.XX__Divide__ = function(other) { return this / other }
 Object.prototype.XX__Modulo__ = function(other) { return this % other }
 Object.prototype.XXPrint = function() { return console.log(this.XXString()) }
 Object.prototype.XX__LessThan__ = function(other) { return this < other }
-Object.prototype.XX__LessThanOrEqual__ = function(other){ return this.XX__Equal__(other) || this.XX__LessThan__(other) }
-Object.prototype.XX__GreaterThan__ = function(other){ return !this.XX__LessThanOrEqual__(other) }
-Object.prototype.XX__GreaterThanOrEqual__ = function(other){ return !this.XX__LessThan__(other) }
+Object.prototype.XX__LessThanOrEqual__ = function(other){ return this.XX__Equal__(other).XX__Bool__() || this.XX__LessThan__(other).XX__Bool__() }
+Object.prototype.XX__GreaterThan__ = function(other){ return !this.XX__LessThanOrEqual__(other).XX__Bool__() }
+Object.prototype.XX__GreaterThanOrEqual__ = function(other){ return !this.XX__LessThan__(other).XX__Bool__() }
 
 var XXNone = new Object(), XXTrue = true, XXFalse = false
 XXNone.XXInspect = function() { return 'None' }
@@ -76,6 +76,7 @@ Boolean.prototype.XX__Bool__ = function() { return this }
 Number.prototype.XXInspect = function() { return this.toString() }
 Number.prototype.XX__Bool__ = function() { return this !== 0 }
 Number.prototype.XXFloor = function() { return Math.floor(this) }
+Number.prototype.XXSquareRoot = function() { return Math.sqrt(this) }
 
 String.prototype.XXInspect = function() { return '"' + this.replace('"', '\\"') + '"' }
 String.prototype.XXString = function() { return this }
@@ -102,9 +103,21 @@ Array.prototype.XX__Equal__ = function(other) {
   if (this.length !== other.length)
     return false
   for (var i = 0; i < this.length; i++)
-    if (this[i] !== other[i])
+    if (!(this[i].XX__Equal__(other[i]).XX__Bool__()))
       return false
   return true
+}
+Array.prototype.XX__LessThan__ = function(other) {
+  var len = Math.min(this.length, other.length)
+  for (var i = 0; i < this.length; i++) {
+    if (this[i].XX__LessThan__(other[i]).XX__Bool__()) {
+      return true
+    }
+    if (other[i].XX__LessThan__(this[i]).XX__Bool__()) {
+      return false
+    }
+  }
+  return this.length < other.length
 }
 Array.prototype.XXMap = function(f) { return this.map(f) }
 Array.prototype.XX__Bool__ = function() { return this.length !== 0 }
@@ -128,7 +141,11 @@ Array.prototype.XXSlice = Slice
 Array.prototype.XXFoldLeft = FoldLeft
 Array.prototype.XXReduce = Reduce
 Array.prototype.XXSize = function() { return this.length }
-
+Array.prototype.XXEach = function(f) {
+  for (var i = 0; i < this.length; i++) {
+    f(this[i])
+  }
+}
 
 Function.prototype.XXInspect = function() { return '[Function]' }
 
