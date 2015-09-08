@@ -129,6 +129,14 @@ Array.prototype.XX__LessThan__ = function(other) {
   }
   return this.length < other.length
 }
+Array.prototype.XX__Add__ = function(other) {
+  var sum = []
+  for (var i = 0; i < this.length; i++)
+    sum.push(this[i])
+  for (var i = 0; i < other.length; i++)
+    sum.push(other[i])
+  return sum
+}
 Array.prototype.XXMap = function(f) { return this.map(f) }
 Array.prototype.XX__Bool__ = function() { return this.length !== 0 }
 Array.prototype.XXPush = function(x) { this.push(x); return this }
