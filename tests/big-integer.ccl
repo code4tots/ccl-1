@@ -1,0 +1,7 @@
+Assert.Equal(
+	1L + 2L,
+	3L)
+
+Assert.Equal(
+	1L - 2L,
+	-1L)
