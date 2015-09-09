@@ -161,7 +161,7 @@ def Parse(string, filename):
     return
     var
 
-    Arguments # Only found as first child of Function and second child of Call nodes.
+    Arguments # Only found as second child of Call nodes.
 
     Assign
 
@@ -214,8 +214,8 @@ def Parse(string, filename):
       return Node('List', None, exprs, origin)
     elif Consume('\\', origin):
       args = []
-      while not At('Newline') and not At('.'):
-        args.append(PrimaryExpression())
+      while At('Name'):
+        args.append(GetToken().value)
         Consume(',')
       dot_origin = [None]
       if Consume('.', dot_origin):
@@ -223,7 +223,7 @@ def Parse(string, filename):
       else:
         EatExpressionDelimiters()
         body = Expression()
-      return Node('Function', None, [Node('Arguments', None, args, origin), body], origin)
+      return Node('Function', args, [body], origin)
     elif Consume('(', origin):
       expr = Expression()
       Expect(')', None, None, origin)
@@ -292,15 +292,131 @@ def Parse(string, filename):
   return Node('Module', None, exprs, exprs[0].origin if exprs else Expect('End').origin)
 
 
-def Evaluate(node):
-  if node.type == 'Module':
-    for child in node.children:
-      Evaluate(child)
-  elif node.type == 'Name':
-    return 
-  else:
-    raise ValueError('Unrecognized node type: ' + node.type)
+class Object(object):
+  pass
+
+
+class Nil(Object):
+  pass
+
+nil = Nil()
+
+
+class Bool(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+true = Bool(True)
+false = Bool(False)
+
+
+class Number(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+
+class String(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+
+class List(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+
+class Function(Object):
+
+  def __init__(self, scope, args, body):
+    self.scope = scope
+    self.args = args
+    self.body = body
+
+
+class Scope(object):
+
+  def __init__(self, parent=None):
+    self.parent = parent
+    self.table = table
+
+  def Declare(self, key):
+    self.table[key] = nil
+
+  def __getitem__(self, key):
+    if key in self.table:
+      return self.table[key]
+    elif self.parent:
+      return self.parent[key]
+    else:
+      raise KeyError(key)
+
+  def __setitem__(self, key, value):
+    assert isinstance(value, Object)
+    if key in self.table:
+      self.table[key] = value
+    elif self.parent:
+      self.parent[key] = value
+    else:
+      raise KeyError(key)
+
+ROOT_SCOPE = Scope()
+
+
+class Evaluator(object):
+
+  def __init__(self):
+    self.scope_stack = [ROOT_SCOPE]
+
+  @property
+  def scope(self):
+    return self.scope_stack[-1]
+
+  def Evaluate(self, node):
+    if node.type == 'Module':
+      for child in node.children:
+        last = self.Evaluate(child)
+      return last
+    elif node.type == 'Name':
+      return self.scope[node.value]
+    elif node.type == 'Number':
+      return Number(self.value)
+    elif node.type == 'String':
+      return String(self.value)
+    elif node.type == 'List':
+      return List([self.Evaluate(n) for n in node.children])
+    elif node.type == 'Function':
+      body, = node.children
+      args = node.value
+      return Function(self.scope, args, body)
+    elif node.type == 'Block':
+      for child in node.children:
+        last = self.Evaluate(child)
+      return last
+    elif node.type == 'Attribute':
+      owner = self.Evaluate(node.children[0])
+      return getattr(owner, node.value)
+    elif node.type == 'Call':
+      f, args = list(map(self.Evaluate, node.children))
+      if isinstance(f, Function):
+        scope = Scope(self.scope)
+        for name, arg in zip(node.args, args):
+          scope.declare(name)
+          scope[name] = arg
+        self.scope_stack.append(scope)
+        try:
+          result = self.Evaluate(body)
+        finally:
+          self.scope_stack.pop()
+      else:
+        result = f(*args)
+      return result
+    else:
+      raise ValueError('Unrecognized node type: ' + node.type)
 
 
 if __name__ == '__main__':
-  sys.stdout.write(Translate(PRELUDE + sys.stdin.read(), '<stdin>'))
+  sys.stdout.write(Evaluator().Evaluate(Parse(sys.stdin.read(), '<stdin>')))
