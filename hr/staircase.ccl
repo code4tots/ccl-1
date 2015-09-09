@@ -1,0 +1,9 @@
+solve = \ N
+  s = ''
+  i = 1
+  while i <= N
+    s = s + ' ' * (N - i) + '#' * i + '\n'
+    i = i + 1
+  return s
+
+solve(Read().Int()).Print()

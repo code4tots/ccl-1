@@ -98,6 +98,12 @@ String.prototype.XXReduce = Reduce
 String.prototype.XXInt = function() { return parseInt(this) }
 String.prototype.XXSize = function() { return this.length }
 String.prototype.XXStrip = function() { return this.replace(/^\s+|\s+$/g, '') }
+String.prototype.XX__Multiply__ = function(n) {
+  var s = ''
+  for (var i = 0; i < n; i++)
+    s += this
+  return s
+}
 
 Array.prototype.XXInspect = function() {
   var s = '['
