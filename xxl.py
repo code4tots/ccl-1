@@ -16,10 +16,11 @@ SYMBOLS = (
 
 KEYWORDS = (
     'is',
-    'while',
+    'while', 'break',
     'if', 'else',
     'and', 'or',
     'return',
+    'var',
 )
 
 NATIVE_PRELUDE = r"""'use strict';
@@ -60,7 +61,6 @@ function Reduce(f) {
 
 Object.prototype.XXString = function() { return this.XXInspect(); }
 Object.prototype.XX__Equal__ = function(other) { return this === other }
-Object.prototype.XX__NotEqual__ = function(other) { return !this.XX__Equal__(other) }
 Object.prototype.XX__Add__ = function(other) { return this + other }
 Object.prototype.XX__Subtract__ = function(other) { return this - other }
 Object.prototype.XX__Multiply__ = function(other) { return this * other }
@@ -456,6 +456,17 @@ def Parse(string, filename):
       elif Peek(-1).type in (';', 'Newline'): # TODO: Find more elegant solution.
         i[0] -= 1
       return Node('if', None, exprs, origin)
+    elif Consume('var', origin):
+      names = []
+      values = []
+      while At('Name'):
+        names.append(GetToken().value)
+        if Consume('='):
+          values.append(Expression())
+        else:
+          values.append(Node('Name', 'None', [], origin))
+        Consume(',')
+      return Node('var', names, values, origin)
     elif Consume('while', origin):
       exprs = [Expression()] # test
       EatExpressionDelimiters()
@@ -504,7 +515,7 @@ def Parse(string, filename):
     expr = AdditiveExpression()
     if Consume('is'):
       return Node('is', None, [expr, AdditiveExpression()], expr.origin)
-    if any(At(symbol) for symbol in ('<', '<=', '>', '>=', '==', '!=')):
+    if any(At(symbol) for symbol in ('<', '<=', '>', '>=', '==')):
       return Node('.%s.' % GetToken().type, None, [expr, AdditiveExpression()], expr.origin)
     return expr
 
@@ -534,36 +545,9 @@ def Parse(string, filename):
 
   return Node('Module', None, exprs, exprs[0].origin if exprs else Expect('End').origin)
 
-def FindAssigned(node):
-  variables = set()
-  if node.type in ('Attribute',):
-    pass
-  elif node.type == 'List':
-    for child in node.children:
-      variables |= FindAssigned(child)
-  elif node.type == 'Name':
-    variables.add(node.value)
-  else:
-    raise TypeError(node.type, node)
-  return variables
-
-def FindDeclaredVariables(node):
-  variables = set()
-  if node.type in ('Name', 'Number', 'String', 'Function'):
-    pass
-  elif node.type in ('List', 'Call', 'Attribute', 'Arguments', 'Block', 'while', 'if', 'return', 'is', '.and.', '.or.', '.<.', '.<=.', '.>.', '.>=.', '.==.', '.+.', '.-.', '.*.', './.', '.%.', '-.'):
-    for child in node.children:
-      variables |= FindDeclaredVariables(child)
-  elif node.type in ('.=.', '.+=.'):
-    target, value = node.children
-    return FindAssigned(target) | FindDeclaredVariables(value)
-  else:
-    raise TypeError(node.type, node)
-  return variables
-
-def GenerateDeclarations(names):
+def GenerateDeclarations(names, values):
   if names:
-    return 'var %s;' % ','.join('XX' + name for name in names)
+    return 'var %s;' % ','.join('XX%s=%s' % (name, Translate(value)) for name, value in zip(names, values))
   return ''
 
 def Translate(node, source=None):
@@ -573,10 +557,7 @@ def Translate(node, source=None):
     return Translate(Parse(node, source))
 
   if node.type == 'Module':
-    names = set()
-    for child in node.children:
-      names |= FindDeclaredVariables(child)
-    return NATIVE_PRELUDE + ';' + GenerateDeclarations(names) + ';'.join(map(Translate, node.children))
+    return NATIVE_PRELUDE + ';' + ';'.join(map(Translate, node.children))
   elif node.type == 'Name':
     return 'XX' + node.value
   elif node.type == 'Number':
@@ -585,10 +566,11 @@ def Translate(node, source=None):
     return '"%s"' % node.value.replace('\\', '\\\\').replace('\n', '\\n').replace('\t', '\\t').replace('\"', '\\"')
   elif node.type == 'List':
     return '[%s]' % ','.join(map(Translate, node.children))
+  elif node.type == 'var':
+    return GenerateDeclarations(node.value, node.children)
   elif node.type == 'Function':
     args, body = node.children
-    decls = GenerateDeclarations(FindDeclaredVariables(body))
-    return '(function(%s){%s%s;return XXNone})' % (','.join(map(Translate, args.children)), decls, Translate(body))
+    return '(function(%s){%s;return XXNone})' % (','.join(map(Translate, args.children)), Translate(body))
   elif node.type == 'Block':
     return '{' + ';'.join(map(Translate, node.children)) + '}'
   elif node.type == 'Attribute':
@@ -630,9 +612,6 @@ def Translate(node, source=None):
   elif node.type == '.==.':
     left, right = map(Translate, node.children)
     return '((%s).XX__Equal__(%s))' % (left, right)
-  elif node.type == '.!=.':
-    left, right = map(Translate, node.children)
-    return '((%s).XX__NotEqual__(%s))' % (left, right)
   elif node.type == '.=.':
     left, right = map(Translate, node.children)
     return '((%s)%s(%s))' % (left, node.type[1:-1], right)

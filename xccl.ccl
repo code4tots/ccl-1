@@ -1,0 +1,62 @@
+var Origin = \ filename position string
+  self = Create()
+  self.filename = filename
+  self.position = position
+  self.string = string
+  return self
+
+var Token = \ type value origin
+  self = Create()
+  self.type = type
+  self.value = value
+  self.origin = origin
+  return self
+
+var Node = \ type value children origin
+  self = Create()
+  self.type = type
+  self.value = value
+  self.children = children
+  self.origin = origin
+  return self
+
+var SYMBOLS = [
+    '\\', '.', '...',
+    ':',
+    '+', '-', '*', '/', '%',
+    '(', ')', '[', ']', ',', '=',
+    '==', '<', '>', '<=', '>=', '!=',
+    ';',
+]
+
+var KEYWORDS = [
+    'is',
+    'while', 'break',
+    'if', 'else',
+    'and', 'or',
+    'return',
+    'var',
+]
+
+
+var Lex = \ string filename
+  var tokens = []
+  var depth = 0
+  var s = string
+  var i = 0
+  var j = 0
+  var indent_stack = ['']
+
+  var MakeToken = \ type value . Token(type, value, Origin(filename, j, s))
+
+  while True
+    while i < s.Size() and ((s.Get(i).IsSpace() and (depth or s.Get(i) != '\n')) or s.Get(i) is '#')
+      if s.Get(i) is '#'
+        while i < s.Size() and s.Get(i) != '\n'
+          i = i + 1
+      else
+        i = i + 1
+
+    j = i
+
+

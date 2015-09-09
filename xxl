@@ -1,0 +1,2 @@
+#!/bin/bash
+cat "$1" | python xxl.py > tmp.js && node tmp.js && rm tmp.js
