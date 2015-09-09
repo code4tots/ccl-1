@@ -1,0 +1,70 @@
+Factorial = \ n
+  result = [1]
+  i = 2
+  while i <= n
+    result = Multiply(result, NumberToLong(i))
+    i = i + 1
+  return LongToString(result)
+
+Multiply = \ a b
+  c = [0] * (a.Size() * b.Size() + 1)
+
+  i = 0
+  while i < a.Size()
+    x = a.Get(i)
+    j = 0
+    while j < b.Size()
+      y = b.Get(j)
+      z = x * y
+      k = 0
+      while z
+        c.Set(i + j + k, c.Get(i + j + k) + z % 10)
+        k = k + 1
+        z = (z / 10).Floor()
+      j = j + 1
+    i = i + 1
+
+  carry = 0
+  i = 0
+  while i < c.Size()
+    carry = c.Get(i) + carry
+    c.Set(i, carry % 10)
+    carry = (carry/10).Floor()
+    i = i + 1
+
+  while c and c.Get(-1) is 0
+    c.Pop()
+
+  return c
+
+NumberToLong = \ n
+  nn = []
+  while n
+    nn.Push(n % 10)
+    n = (n / 10).Floor()
+  return nn
+
+LongToString = \ nn
+  s = ['']
+  nn.Reverse().Each() \ n
+    s.Set(0, s.Get(0) + n.String())
+  return s.Get(0)
+
+Assert.Equal(
+  NumberToLong(123),
+  [3, 2, 1])
+
+Assert.Equal(
+  Multiply(
+    NumberToLong(123),
+    NumberToLong(456)),
+  NumberToLong(56088))
+
+Assert.Equal(
+  LongToString(NumberToLong(123)),
+  '123')
+
+Assert.Equal(
+  Factorial(10),
+  '3628800')
+

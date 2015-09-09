@@ -143,9 +143,17 @@ Array.prototype.XX__Add__ = function(other) {
     sum.push(other[i])
   return sum
 }
+Array.prototype.XX__Multiply__ = function(other) {
+  var ret = []
+  for (var i = 0; i < other; i++)
+    for (var j = 0; j < this.length; j++)
+      ret.push(this[j])
+  return ret
+}
 Array.prototype.XXMap = function(f) { return this.map(f) }
 Array.prototype.XX__Bool__ = function() { return this.length !== 0 }
 Array.prototype.XXPush = function(x) { this.push(x); return this }
+Array.prototype.XXPop = function(x) { return this.pop() }
 Array.prototype.XXGet = function(index) {
   if (index < 0)
     index += this.length
@@ -182,6 +190,7 @@ Array.prototype.XXGroupBy = function(n) {
   }
   return ret
 }
+Array.prototype.XXReverse = function() { return this.reverse() }
 
 Function.prototype.XXInspect = function() { return '[Function]' }
 
