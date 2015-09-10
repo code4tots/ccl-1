@@ -50,8 +50,8 @@ var Lex = \ string filename
   var MakeToken = \ type value . Token(type, value, Origin(filename, j, s))
 
   while True
-    while i.LessThan(s.Size()) and ((s.Get(i).IsSpace() and (depth or s.Get(i).NotEqual('\n'))) or s.Get(i) is '#')
-      if s.Get(i) is '#'
+    while i.LessThan(s.Size()) and ((s.Get(i).IsSpace() and (depth or s.Get(i).NotEqual('\n'))) or s.Get(i).Is('#'))
+      if s.Get(i).Is('#')
         while i.LessThan(s.Size()) and s.Get(i).NotEqual('\n')
           i = i.Add(1)
       else
