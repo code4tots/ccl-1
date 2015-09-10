@@ -144,7 +144,7 @@ def Lex(string, filename):
       i += len(quote)
       tokens.append(MakeToken('String', eval(s[j:i])))
     elif s[i].isalnum() or s[i] == '_':
-      while i < len(s) and s[i].isalnum() or s[i] == '_':
+      while i < len(s) and (s[i].isalnum() or s[i] == '_'):
         i += 1
       word = s[j:i]
       if word in KEYWORDS:
