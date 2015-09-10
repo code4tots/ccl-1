@@ -278,7 +278,7 @@ def Parse(string, filename):
     return expr
 
   def AssignExpression():
-    expr = OrExpression()
+    expr = PostfixExpression()
     if Consume('='):
       return Node('Assign', None, [expr, AssignExpression()], expr.origin)
     return expr
@@ -293,11 +293,18 @@ def Parse(string, filename):
 
 
 class Object(object):
-  pass
 
+  def XXPrint(self):
+    print(self)
+    return self
+
+  def __str__(self):
+    return self.XXString().value
 
 class Nil(Object):
-  pass
+
+  def XXString(self):
+    return String('nil')
 
 nil = Nil()
 
@@ -306,6 +313,9 @@ class Bool(Object):
 
   def __init__(self, value):
     self.value = value
+
+  def XXString(self):
+    return String('true' if self.value else 'false')
 
 true = Bool(True)
 false = Bool(False)
@@ -316,6 +326,13 @@ class Number(Object):
   def __init__(self, value):
     self.value = value
 
+  def XXAdd(self, other):
+    if isinstance(other, Number):
+      return Number(self.value + other.value)
+    raise Exception((other.type, other))
+
+  def XXString(self):
+    return String(str(self.value))
 
 class String(Object):
 
@@ -341,10 +358,10 @@ class Scope(object):
 
   def __init__(self, parent=None):
     self.parent = parent
-    self.table = table
+    self.table = dict()
 
-  def Declare(self, key):
-    self.table[key] = nil
+  def Declare(self, key, value=None):
+    self.table[key] = nil if value is None else value
 
   def __getitem__(self, key):
     if key in self.table:
@@ -364,7 +381,9 @@ class Scope(object):
       raise KeyError(key)
 
 ROOT_SCOPE = Scope()
-
+ROOT_SCOPE.Declare('nil', nil)
+ROOT_SCOPE.Declare('true', true)
+ROOT_SCOPE.Declare('false', false)
 
 class Evaluator(object):
 
@@ -383,9 +402,9 @@ class Evaluator(object):
     elif node.type == 'Name':
       return self.scope[node.value]
     elif node.type == 'Number':
-      return Number(self.value)
+      return Number(node.value)
     elif node.type == 'String':
-      return String(self.value)
+      return String(node.value)
     elif node.type == 'List':
       return List([self.Evaluate(n) for n in node.children])
     elif node.type == 'Function':
@@ -397,8 +416,7 @@ class Evaluator(object):
         last = self.Evaluate(child)
       return last
     elif node.type == 'Attribute':
-      owner = self.Evaluate(node.children[0])
-      return getattr(owner, node.value)
+      return getattr(self.Evaluate(node.children[0]), 'XX' + node.value)
     elif node.type == 'Call':
       f, args = list(map(self.Evaluate, node.children))
       if isinstance(f, Function):
@@ -409,14 +427,51 @@ class Evaluator(object):
         self.scope_stack.append(scope)
         try:
           result = self.Evaluate(body)
+        except ReturnException as e:
+          result = e.result
         finally:
           self.scope_stack.pop()
       else:
         result = f(*args)
       return result
+    elif node.type == 'if':
+      if self.Evaluate(node.children[0]):
+        return self.Evaluate(node.children[1])
+      elif len(node.children) == 2:
+        return nil
+      else:
+        return self.Evaluate(node.children[2])
+    elif node.type == 'while':
+      while self.Evaluate(node.children[0]):
+        try:
+          last = self.Evaluate(node.children[1])
+        except BreakException:
+          break
+      return last
+    elif node.type == 'break':
+      raise BreakException()
+    elif node.type == 'return':
+      raise ReturnException(self.Evaluate(node.children[0]))
+    elif node.type == 'var':
+      for name in node.values:
+        self.scope.Declare(name)
+      return nil
+    elif node.type == 'Arguments':
+      return list(map(self.Evaluate, node.children))
+    elif node.type == 'Assign':
+      target, value = node.children
+      value = self.Evaluate(value)
+      if target.type == 'Name':
+        self.scope[target.value] = value
+      elif target.type == 'Attribute':
+        owner, = list(map(self.Evaluate, target.children))
+        setattr(owner, 'XX' + target.value, value)
+      else:
+        raise Exception('%s is not assignable' % node.type)
     else:
       raise ValueError('Unrecognized node type: ' + node.type)
 
 
 if __name__ == '__main__':
-  sys.stdout.write(Evaluator().Evaluate(Parse(sys.stdin.read(), '<stdin>')))
+  Evaluator().Evaluate(Parse(sys.stdin.read(), '<stdin>'))
+
