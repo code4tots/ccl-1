@@ -188,6 +188,12 @@ class Node(object):
     return (self.type, self.value, self.children) == (other.type, other.value, other.children)
 
 
+class ParseError(Exception):
+
+  def __init__(self, message, origin):
+    super(ParseError, self).__init__(message + '\n' + origin.LocationMessage())
+
+
 def Parse(string, filename):
   """
   Parse node types:
@@ -232,9 +238,9 @@ def Parse(string, filename):
     if At(type_, origin):
       return GetToken()
 
-  def Expect(type_, origin=None, error_message=None, error_origin=None):
+  def Expect(type_, origin=None):
     if not At(type_, origin):
-      raise SyntaxError('Expected %s but found %s' % (type_, Peek()[0]))
+      raise ParseError('Expected %s but found %s' % (type_, Peek().type), Peek().origin)
     return GetToken()
 
   def EatExpressionDelimiters():
@@ -305,7 +311,7 @@ def Parse(string, filename):
       return Node('while', None, exprs, origin)
     elif Consume('return', origin):
       return Node('return', None, [Expression()], origin)
-    raise SyntaxError('Expected Expression but found %s' % (Peek(),))
+    raise ParseError('Expected Expression but found %s' % (Peek().type,), Peek().origin)
 
   def PostfixExpression():
     expr = PrimaryExpression()
@@ -481,3 +487,14 @@ assert node == Node('Module', None, [
         ]),
     ]),
 ]), node
+
+try:
+  Parse('=', '<test>')
+except ParseError as e:
+  assert str(e) == """Expected Expression but found =
+in <test> on line 1 column 1
+=
+*
+""", str(e)
+else:
+  assert False, "Parse('=', '<test>') should have raised error but didn't"
