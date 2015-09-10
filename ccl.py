@@ -60,6 +60,12 @@ KEYWORDS = (
 )
 
 
+class LexError(Exception):
+
+  def __init__(self, message, origin):
+    super(LexError, self).__init__(message + '\n' + origin.LocationMessage())
+
+
 def Lex(string, filename):
   tokens = []
   depth = 0
@@ -67,8 +73,11 @@ def Lex(string, filename):
   i = 0
   indent_stack = ['']
 
+  def MakeOrigin():
+    return Origin(filename, s, j)
+
   def MakeToken(type_, value=None):
-    return Token(type_, value, Origin(filename, s, j))
+    return Token(type_, value, MakeOrigin())
 
   while True:
     while i < len(s) and ((s[i].isspace() and (depth or s[i] != '\n')) or s[i] == '#'):
@@ -111,7 +120,7 @@ def Lex(string, filename):
             tokens.append(MakeToken('Newline'))
             indent_stack.pop()
         else:
-          raise SyntaxError('Invalid indent: ' + repr(indent))
+          raise LexError('Invalid indent: ' + repr(indent), MakeOrigin())
 
     elif s[i].isdigit() or s[i] == '.' and s[i+1:i+2].isdigit():
       while i < len(s) and s[i].isdigit():
@@ -130,7 +139,7 @@ def Lex(string, filename):
       i += len(quote)
       while not s.startswith(quote, i):
         if i >= len(s):
-          raise SyntaxError("Missing quotes for: " + quote)
+          raise LexError("Missing quotes for: " + quote, MakeOrigin)
         i += 2 if not raw and s[i] == '\\' else 1
       i += len(quote)
       tokens.append(MakeToken('String', eval(s[j:i])))
@@ -153,7 +162,7 @@ def Lex(string, filename):
     else:
       while i < len(s) and not s[i].isspace():
         i += 1
-      raise SyntaxError("Unrecognized token: " + s[j:i])
+      raise LexError("Unrecognized token: " + s[j:i], MakeOrigin())
 
   while indent_stack[-1] != '':
     tokens.append(MakeToken('Dedent'))
@@ -428,6 +437,17 @@ assert (
         Token('End'),
     ]
 ), tokens
+
+try:
+  Lex('!@#', '<test>')
+except LexError as e:
+  assert str(e) == """Unrecognized token: !@#
+in <test> on line 1 column 1
+!@#
+*
+""", str(e)
+else:
+  assert False, "Lex('!@#', '<test>') should have raised error but didn't"
 
 node = Parse("""
 i = 0
