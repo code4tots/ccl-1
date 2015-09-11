@@ -50,7 +50,8 @@ class Token(object):
 
 SYMBOLS = (
     '\\', '.',
-    '(', ')', '=',
+    '(', ')', '[', ']',
+    '=',
     ';', ',',
 )
 
@@ -282,7 +283,7 @@ def Parse(string, filename):
       return Node('Function', args, [body], origin[0])
     elif Consume('(', origin):
       expr = Expression()
-      Expect(')', None, None, origin)
+      Expect(')')
       return expr
     elif Consume('Indent', origin):
       exprs = []
@@ -377,6 +378,12 @@ class Object(object):
   def XXString(self):
     return String('<Object %d>' % id(self))
 
+  def XXEqual(self, other):
+    return Bool(id(self) == id(other))
+
+  def __eq__(self, other):
+    return self.XXEqual(other)
+
   def __bool__(self):
     return self.__nonzero__()
 
@@ -397,7 +404,19 @@ class Nil(Object):
 nil = Nil()
 
 
-class Bool(Object):
+class WrapedObject(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+  def XXBool(self):
+    return true if self.value else false
+
+  def XXEqual(self, other):
+    return type(self) == type(other) and self.value == other.value
+
+
+class Bool(WrapedObject):
 
   def __init__(self, value):
     self.value = value
@@ -412,7 +431,7 @@ true = Bool(True)
 false = Bool(False)
 
 
-class Number(Object):
+class Number(WrapedObject):
 
   def __init__(self, value):
     self.value = value
@@ -422,14 +441,16 @@ class Number(Object):
       return Number(self.value + other.value)
     raise Exception((other.type, other))
 
+  def XXLessThan(self, other):
+    if not isinstance(other, Number):
+      raise CclError('Can only Number.LessThan with other numbers')
+    return Bool(self.value < other.value)
+
   def XXString(self):
     return String(str(self.value))
 
-  def XXBool(self):
-    return true if self.value else false
 
-
-class String(Object):
+class String(WrapedObject):
 
   def __init__(self, value):
     self.value = value
@@ -437,17 +458,24 @@ class String(Object):
   def XXString(self):
     return self
 
-  def XXBool(self):
-    return true if self.value else false
 
-
-class List(Object):
+class List(WrapedObject):
 
   def __init__(self, value):
     self.value = value
 
-  def XXBool(self):
-    return true if self.value else false
+  def XXPush(self, other):
+    self.value.append(other)
+
+  def XXString(self):
+    return String('[%s]' % ', '.join(map(str, self.value)))
+
+
+class BuiltinFunction(WrapedObject):
+
+  def __call__(self, *args):
+    result = self.value(*args)
+    return nil if result is None else result
 
 
 class UserFunction(Object):
@@ -464,19 +492,6 @@ class UserFunction(Object):
       scope.Declare(name)
       scope[name] = arg
     return Evaluate(scope, self.body)
-
-  def XXBool(self):
-    return true
-
-
-class BuiltinFunction(Object):
-
-  def __init__(self, f):
-    self.f = f
-
-  def __call__(self, *args):
-    result = self.f(*args)
-    return nil if result is None else result
 
   def XXBool(self):
     return true
@@ -659,7 +674,7 @@ def Run(string, filename=None):
   return Evaluate(ROOT_SCOPE, Parse(string, filename or '<unknown>'))
 
 
-def QuickRun(string, filename=None):
+def RunX(string, filename=None):
   try:
     return Run(string, filename)
   except CclError as e:
@@ -823,9 +838,20 @@ except AssertError as e:
 else:
   assert False, "Assert(false) should have raised error but didn't"
 
+RunX(r"""
+Assert("a".Equal("a"), '"a" should equal "a"')
+Assert((1).Add(2).Equal(3))
 
-Run(r"""
+var i xs
 
-Assert("a".Equal("a"))
+xs = []
+i = 0
+while i.LessThan(3)
+  xs.Push(i)
+  i = i.Add(1)
+
+Assert(xs.Equal([0, 1, 2]), xs)
+Assert(xs.String().Equal('[0, 1, 2]'), xs.String())
 
 """)
+
