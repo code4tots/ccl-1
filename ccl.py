@@ -483,8 +483,7 @@ class List(WrapedObject):
 class BuiltinFunction(WrapedObject):
 
   def __call__(self, *args):
-    result = self.value(*args)
-    return nil if result is None else result
+    return ConvertValue(self.value(*args))
 
 
 class UserFunction(Object):
@@ -526,7 +525,7 @@ class Scope(object):
       raise KeyError(key)
 
   def __setitem__(self, key, value):
-    assert isinstance(value, Object)
+    assert isinstance(value, Object), type(value)
     if key in self.table:
       self.table[key] = value
     elif self.parent is not None:
@@ -574,6 +573,23 @@ class ReturnException(Exception):
 
 class AssertError(CclError):
   pass
+
+
+def ConvertValue(value):
+  if isinstance(value, Object):
+    return value
+  elif value is None:
+    return nil
+  elif isinstance(value, bool):
+    return Bool(value)
+  elif isinstance(value, (int, float)):
+    return Number(value)
+  elif isinstance(value, str):
+    return String(value)
+  elif isinstance(value, list):
+    return List(map(ConvertValue, value))
+  else:
+    raise TypeError("Value is not convertible: %s" % type(value))
 
 
 def Evaluate(scope, node):
@@ -630,12 +646,13 @@ def Evaluate(scope, node):
       f = Evaluate(scope, node.children[0])
       args = Evaluate(scope, node.children[1])
       try:
-        return f(*args)
+        result = f(*args)
       except ReturnException as e:
-        return e.value
+        result = e.value
       except CclError as e:
         e.trace.append(node.origin)
         raise
+      return ConvertValue(result)
     elif node.type == 'Arguments':
       return [Evaluate(scope, n) for n in node.children]
     elif node.type == 'GetAttribute':

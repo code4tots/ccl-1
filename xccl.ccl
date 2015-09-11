@@ -4,6 +4,47 @@ var Origin = \ filename string position
   self.filename = filename
   self.string = string
   self.position = position
+
+  self.LocationMessage = \
+    return 'in %s on line %d column %d\n%s\n%s*\n'.Format([
+        self.filename,
+        self.LineNumber(),
+        self.ColumnNumber(),
+        self.Line(),
+        ' '.Multiply(self.ColumnNumber().Subtract(1)),
+    ])
+
+  self.LineNumber = \
+    return self.string.Count('\n', 0, self.position).Add(1)
+
+  self.ColumnNumber = \
+    return self.position.Subtract(self.LineStart()).Add(1)
+
+  self.Line = \
+    return self.String.Slice(self.LineStart(), self.LineEnd())
+
+  self.LineStart = \
+    var i = self.position
+    while i.GreaterThanOrEqual(0) and self.string.Get(i)
+      i = i.Subtract(1)
+    return i.Add(1)
+
+  self.LineEnd = \
+    var i
+    return i
+
+  return self
+
+
+var Token = \ type value origin
+  var self = Create()
+  self.type = type
+  self.value = value
+  self.origin = origin
+
+  self.Equal = \ other
+    return self.type.Equal(other.type) and self.value.Equal(other.value)
+
   return self
 
 
