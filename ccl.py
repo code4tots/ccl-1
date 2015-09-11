@@ -1,5 +1,8 @@
 """ccl.py"""
 
+import sys
+
+
 class Origin(object):
 
   def __init__(self, filename, string, position):
@@ -57,6 +60,7 @@ KEYWORDS = (
     'if', 'else',
     'and', 'or',
     'return',
+    'var',
 )
 
 
@@ -139,7 +143,7 @@ def Lex(string, filename):
       i += len(quote)
       while not s.startswith(quote, i):
         if i >= len(s):
-          raise LexError("Missing quotes for: " + quote, MakeOrigin)
+          raise LexError("Missing quotes for: " + quote, MakeOrigin())
         i += 2 if not raw and s[i] == '\\' else 1
       i += len(quote)
       tokens.append(MakeToken('String', eval(s[j:i])))
@@ -211,7 +215,8 @@ def Parse(string, filename):
     return
     Call
     Arguments
-    Attribute
+    GetAttribute
+    SetAttribute
     and
     or
     Assign
@@ -251,6 +256,7 @@ def Parse(string, filename):
     return AssignExpression()
 
   def MakeNodeFromToken(token):
+    print(token.origin)
     return Node(token.type, token.value, [], token.origin)
 
   def PrimaryExpression():
@@ -325,7 +331,11 @@ def Parse(string, filename):
           args.append(PrimaryExpression())
         expr = Node('Call', None, [expr, Node('Arguments', None, args, expr.origin)], expr.origin)
       elif Consume('.'):
-        expr = Node('Attribute', Expect('Name').value, [expr], expr.origin)
+        name = Expect('Name').value
+        if Consume('='):
+          expr = Node('SetAttribute', name, [expr, Expression()])
+        else:
+          expr = Node('GetAttribute', name, [expr], expr.origin)
       else:
         break
     return expr
@@ -358,6 +368,233 @@ def Parse(string, filename):
 
   return Node('Module', None, exprs, exprs[0].origin if exprs else Expect('End').origin)
 
+
+class Object(object):
+
+  def XXPrint(self):
+    print(self)
+    return self
+
+  def __str__(self):
+    return self.XXString().value
+
+class Nil(Object):
+
+  def XXString(self):
+    return String('nil')
+
+nil = Nil()
+
+
+class Bool(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+  def XXString(self):
+    return String('true' if self.value else 'false')
+
+true = Bool(True)
+false = Bool(False)
+
+
+class Number(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+  def XXAdd(self, other):
+    if isinstance(other, Number):
+      return Number(self.value + other.value)
+    raise Exception((other.type, other))
+
+  def XXString(self):
+    return String(str(self.value))
+
+
+class String(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+  def XXString(self):
+    return self
+
+class List(Object):
+
+  def __init__(self, value):
+    self.value = value
+
+
+class Function(Object):
+
+  def __init__(self, scope, args, body):
+    self.scope = scope
+    self.args = args
+    self.body = body
+
+  def __call__(self, *args):
+    args = [Evaluate(self.scope, arg) for arg in args]
+    scope = Scope(self.scope)
+    for name, arg in zip(self.args, args):
+      scope.Declare(name)
+      scope[name] = arg
+
+    try:
+      return Evaluate(scope, self.body)
+    except ReturnException as e:
+      return e.value
+    except CclError as e:
+      e.trace.append(self.body.origin)
+      raise
+
+
+class Scope(object):
+
+  def __init__(self, parent=None):
+    self.parent = parent
+    self.table = dict()
+
+  def Declare(self, key, value=None):
+    self.table[key] = nil if value is None else value
+
+  def __getitem__(self, key):
+    if key in self.table:
+      return self.table[key]
+    elif self.parent is not None:
+      return self.parent[key]
+    else:
+      raise KeyError(key)
+
+  def __setitem__(self, key, value):
+    assert isinstance(value, Object)
+    if key in self.table:
+      self.table[key] = value
+    elif self.parent is not None:
+      self.parent[key] = value
+    else:
+      raise KeyError(key)
+
+ROOT_SCOPE = Scope()
+ROOT_SCOPE.Declare('nil', nil)
+ROOT_SCOPE.Declare('true', true)
+ROOT_SCOPE.Declare('false', false)
+
+
+class CclError(Exception):
+
+  def __init__(self, message, origin):
+    print(origin)
+    super(CclError, self).__init__(message + '\n' + origin.LocationMessage())
+    self.message = message
+    self.trace = [origin]
+
+  def __str__(self):
+    return self.message + '\n' + ''.join(origin.LocationMessage() for origin in self.trace)
+
+class BreakException(Exception):
+  pass
+
+
+class ReturnException(Exception):
+
+  def __init__(self, value):
+    self.value = value
+
+
+def Evaluate(scope, node):
+
+  if node.type == 'Module':
+    last = nil
+    for child in node.children:
+      last = Evaluate(scope, child)
+    return last
+  elif node.type == 'Name':
+    try:
+      return scope[node.value]
+    except KeyError as e:
+      raise CclError('%s is not defined' % str(e), node.origin)
+  elif node.type == 'String':
+    return String(node.value)
+  elif node.type == 'Number':
+    return Number(node.value)
+  elif node.type == 'List':
+    return List([Evaluate(scope, n) for n in node.children])
+  elif node.type == 'Function':
+    return Function(scope, node.value, node.children[0])
+  elif node.type == 'Block':
+    last = nil
+    for child in node.children:
+      last = Evaluate(scope, child)
+    return last
+  elif node.type == 'break':
+    raise BreakException()
+  elif node.type == 'var':
+    for name in node.value:
+      scope.Declare(name)
+    return nil
+  elif node.type == 'if':
+    if Evaluate(scope, node.children[0]):
+      return Evaluate(scope, node.children[1])
+    elif len(node.children) == 2:
+      return nil
+    else:
+      return Evaluate(scope, node.children[2])
+  elif node.type == 'while':
+    last = nil
+    while Evaluate(scope, node.children[0]):
+      last = Evaluate(scope, node.children[1])
+    return last
+  elif node.type == 'return':
+    raise ReturnException(Evaluate(scope, node.children[0]))
+  elif node.type == 'Call':
+    return Evaluate(scope, node.children[0])(*Evaluate(scope, node.children[1]))
+  elif node.type == 'Arguments':
+    return [Evaluate(scope, n) for n in node.children]
+  elif node.type == 'GetAttribute':
+    value, = node.children
+    owner = Evaluate(scope, value)
+    attr = 'XX' + node.value
+    try:
+      return getattr(owner, attr)
+    except AttributeError:
+      raise CclError('Object has no attribute ' + node.value, node.origin)
+  elif node.type == 'SetAttribute':
+    lhs, rhs = [Evaluate(scope, n) for n in node.children]
+    return setattr(lhs, node.value, 'XX' + rhs)
+  elif node.type == 'and':
+    lhs, rhs = node.children
+    lhs = Evaluate(scope, lhs)
+    if lhs:
+      return Evaluate(scope, rhs)
+    else:
+      return lhs
+  elif node.type == 'or':
+    lhs, rhs = node.children
+    lhs = Evaluate(scope, lhs)
+    if lhs:
+      return lhs
+    else:
+      return Evaluate(scope, rhs)
+  elif node.type == 'Assign':
+    name = node.value
+    value = Evaluate(scope, node.children[0])
+    try:
+      scope[name] = value
+    except KeyError as e:
+      raise CclError('%s is not defined' % str(e), node.origin)
+    return value
+
+  raise CclError('Unrecognized node ' + node.type, node.origin)
+
+
+def Run(string, filename=None):
+  filename = filename or '<unknown>'
+  try:
+    return Evaluate(ROOT_SCOPE, Parse(string, filename))
+  except CclError as e:
+    sys.stderr.write('***** Error *****\n' + str(e))
+    exit(1)
 
 ### Test
 
@@ -466,25 +703,34 @@ assert node == Node('Module', None, [
     Node('Assign', 'i', [Node('Number', 0, [])]),
     Node('while', None, [
         Node('Call', None, [
-            Node('Attribute', 'LessThan', [Node('Name', 'i', [])]),
+            Node('GetAttribute', 'LessThan', [Node('Name', 'i', [])]),
             Node('Arguments', None, [
                 Node('Number', 10, []),
             ]),
         ]),
         Node('Block', None, [
             Node('Call', None, [
-                Node('Attribute', 'Print', [Node('Name', 'i', [])]),
+                Node('GetAttribute', 'Print', [Node('Name', 'i', [])]),
                 Node('Arguments', None, []),
             ]),
             Node('Assign', 'i', [
                 Node('Call', None, [
-                    Node('Attribute', 'Add', [Node('Name', 'i', [])]),
+                    Node('GetAttribute', 'Add', [Node('Name', 'i', [])]),
                     Node('Arguments', None, [
                         Node('Number', 1, []),
                     ]),
                 ]),
             ]),
         ]),
+    ]),
+]), node
+
+node = Parse("a.b = 4.4", '<test>')
+
+assert node == Node('Module', None, [
+    Node('SetAttribute', 'b', [
+        Node('Name', 'a', []),
+        Node('Number', 4.4, []),
     ]),
 ]), node
 
@@ -498,3 +744,16 @@ in <test> on line 1 column 1
 """, str(e)
 else:
   assert False, "Parse('=', '<test>') should have raised error but didn't"
+
+
+Run(r"""
+var x
+
+"hi".Print()
+
+x.Print()
+
+f = \ . Create()
+
+""", '<test>')
+
