@@ -186,6 +186,9 @@ class Node(object):
     self.children = children
     self.origin = origin
 
+    if origin is not None and not isinstance(origin, Origin):
+      raise TypeError('origin must be None or Origin but found ' + str(type(origin)))
+
   def __repr__(self):
     return 'Node(%r, %r, %r)' % (self.type, self.value, self.children)
 
@@ -296,9 +299,15 @@ def Parse(string, filename):
       return Node('break', origin[0])
     elif Consume('var', origin):
       names = []
+      values = []
       while At('Name'):
         names.append(GetToken().value)
-      return Node('var', names, [], origin[0])
+        if Consume('='):
+          values.append(Expression())
+        else:
+          values.append(Node('Name', 'nil', [], origin[0]))
+        Consume(',')
+      return Node('var', names, values, origin[0])
     elif Consume('if', origin):
       exprs = [Expression()] # test
       EatExpressionDelimiters()
@@ -486,7 +495,6 @@ class UserFunction(Object):
     self.body = body
 
   def __call__(self, *args):
-    args = [Evaluate(self.scope, arg) for arg in args]
     scope = Scope(self.scope)
     for name, arg in zip(self.args, args):
       scope.Declare(name)
@@ -600,8 +608,9 @@ def Evaluate(scope, node):
     elif node.type == 'break':
       raise BreakException()
     elif node.type == 'var':
-      for name in node.value:
+      for name, arg in zip(node.value, node.children):
         scope.Declare(name)
+        scope[name] = Evaluate(scope, arg)
       return nil
     elif node.type == 'if':
       if Evaluate(scope, node.children[0]):
@@ -639,7 +648,7 @@ def Evaluate(scope, node):
         raise CclError('Object has no attribute ' + node.value)
     elif node.type == 'SetAttribute':
       lhs, rhs = [Evaluate(scope, n) for n in node.children]
-      return setattr(lhs, node.value, 'XX' + rhs)
+      return setattr(lhs, 'XX' + node.value, rhs)
     elif node.type == 'and':
       lhs, rhs = node.children
       lhs = Evaluate(scope, lhs)
@@ -855,3 +864,7 @@ Assert(xs.String().Equal('[0, 1, 2]'), xs.String())
 
 """)
 
+### Main
+
+if __name__ == '__main__':
+  RunX(sys.stdin.read(), '<stdin>')

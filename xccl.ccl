@@ -1,0 +1,15 @@
+
+var Origin = \ filename string position
+  var self = Create()
+  self.filename = filename
+  self.string = string
+  self.position = position
+  return self
+
+
+var origin = Origin('a', 'b', 'c')
+
+origin.Print()
+origin.filename.Print()
+
+nil.Print()
