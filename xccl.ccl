@@ -25,12 +25,14 @@ var Origin = \ filename string position
 
   self.LineStart = \
     var i = self.position
-    while i.GreaterThanOrEqual(0) and self.string.Get(i)
+    while i.GreaterThanOrEqual(0) and self.string.Get(i).NotEqual('\n')
       i = i.Subtract(1)
     return i.Add(1)
 
   self.LineEnd = \
-    var i
+    var i = self.position
+    while i.LessThan(self.Size()) and self.string.Get(i).NotEqual('\n')
+      i = i.Add(1)
     return i
 
   return self
@@ -48,9 +50,8 @@ var Token = \ type value origin
   return self
 
 
-var origin = Origin('a', 'b', 'c')
+# Tests
 
-origin.Print()
-origin.filename.Print()
+var origin = Origin('<test>', r"""
+""", 1)
 
-nil.Print()

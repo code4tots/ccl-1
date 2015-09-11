@@ -140,7 +140,7 @@ def Lex(string, filename):
       if s[i] == 'r':
         i += 1
         raw = True
-      quote = s[i:i+3] if s.startswith(('""""', "'''"), i) else s[i:i+1]
+      quote = s[i:i+3] if s.startswith(('"""', "'''"), i) else s[i:i+1]
       i += len(quote)
       while not s.startswith(quote, i):
         if i >= len(s):
