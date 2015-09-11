@@ -352,13 +352,13 @@ def Parse(string, filename):
   def AndExpression():
     expr = PostfixExpression()
     while Consume('and'):
-      expr = Node('and', [expr, AndExpression()])
+      expr = Node('and', None, [expr, AndExpression()])
     return expr
 
   def OrExpression():
     expr = AndExpression()
     while Consume('or'):
-      expr = Node('or', [expr, OrExpression()])
+      expr = Node('or', None, [expr, OrExpression()])
     return expr
 
   def AssignExpression():
