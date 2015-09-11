@@ -51,7 +51,7 @@ class Token(object):
 SYMBOLS = (
     '\\', '.',
     '(', ')', '=',
-    ';',
+    ';', ',',
 )
 
 
@@ -256,7 +256,6 @@ def Parse(string, filename):
     return AssignExpression()
 
   def MakeNodeFromToken(token):
-    print(token.origin)
     return Node(token.type, token.value, [], token.origin)
 
   def PrimaryExpression():
@@ -268,7 +267,7 @@ def Parse(string, filename):
       while not Consume(']'):
         exprs.append(Expression())
         Consume(',')
-      return Node('List', None, exprs, origin)
+      return Node('List', None, exprs, origin[0])
     elif Consume('\\', origin):
       args = []
       while At('Name'):
@@ -276,11 +275,11 @@ def Parse(string, filename):
         Consume(',')
       dot_origin = [None]
       if Consume('.', dot_origin):
-        body = Node('return', None, [Expression()], dot_origin)
+        body = Node('return', None, [Expression()], dot_origin[0])
       else:
         EatExpressionDelimiters()
         body = Expression()
-      return Node('Function', args, [body], origin)
+      return Node('Function', args, [body], origin[0])
     elif Consume('(', origin):
       expr = Expression()
       Expect(')', None, None, origin)
@@ -291,14 +290,14 @@ def Parse(string, filename):
       while not Consume('Dedent'):
         exprs.append(Expression())
         EatExpressionDelimiters()
-      return Node('Block', None, exprs, origin)
+      return Node('Block', None, exprs, origin[0])
     elif Consume('break', origin):
-      return Node('break', origin)
+      return Node('break', origin[0])
     elif Consume('var', origin):
       names = []
       while At('Name'):
         names.append(GetToken().value)
-      return Node('var', names, [], origin)
+      return Node('var', names, [], origin[0])
     elif Consume('if', origin):
       exprs = [Expression()] # test
       EatExpressionDelimiters()
@@ -309,14 +308,14 @@ def Parse(string, filename):
         exprs.append(Expression()) # else
       elif Peek(-1).type in (';', 'Newline'): # TODO: Find more elegant solution.
         i[0] -= 1
-      return Node('if', None, exprs, origin)
+      return Node('if', None, exprs, origin[0])
     elif Consume('while', origin):
       exprs = [Expression()] # test
       EatExpressionDelimiters()
       exprs.append(Expression()) # body
-      return Node('while', None, exprs, origin)
+      return Node('while', None, exprs, origin[0])
     elif Consume('return', origin):
-      return Node('return', None, [Expression()], origin)
+      return Node('return', None, [Expression()], origin[0])
     raise ParseError('Expected Expression but found %s' % (Peek().type,), Peek().origin)
 
   def PostfixExpression():
@@ -333,7 +332,7 @@ def Parse(string, filename):
       elif Consume('.'):
         name = Expect('Name').value
         if Consume('='):
-          expr = Node('SetAttribute', name, [expr, Expression()])
+          expr = Node('SetAttribute', name, [expr, Expression()], expr.origin)
         else:
           expr = Node('GetAttribute', name, [expr], expr.origin)
       else:
@@ -357,7 +356,7 @@ def Parse(string, filename):
       origin = [None]
       name = Expect('Name', origin).value
       Expect('=')
-      return Node('Assign', name, [AssignExpression()], origin)
+      return Node('Assign', name, [AssignExpression()], origin[0])
     return OrExpression()
 
   exprs = []
@@ -375,6 +374,15 @@ class Object(object):
     print(self)
     return self
 
+  def XXString(self):
+    return String('<Object %d>' % id(self))
+
+  def __bool__(self):
+    return self.__nonzero__()
+
+  def __nonzero__(self):
+    return self.XXBool().value
+
   def __str__(self):
     return self.XXString().value
 
@@ -382,6 +390,9 @@ class Nil(Object):
 
   def XXString(self):
     return String('nil')
+
+  def XXBool(self):
+    return false
 
 nil = Nil()
 
@@ -393,6 +404,9 @@ class Bool(Object):
 
   def XXString(self):
     return String('true' if self.value else 'false')
+
+  def XXBool(self):
+    return self
 
 true = Bool(True)
 false = Bool(False)
@@ -411,6 +425,9 @@ class Number(Object):
   def XXString(self):
     return String(str(self.value))
 
+  def XXBool(self):
+    return true if self.value else false
+
 
 class String(Object):
 
@@ -420,13 +437,20 @@ class String(Object):
   def XXString(self):
     return self
 
+  def XXBool(self):
+    return true if self.value else false
+
+
 class List(Object):
 
   def __init__(self, value):
     self.value = value
 
+  def XXBool(self):
+    return true if self.value else false
 
-class Function(Object):
+
+class UserFunction(Object):
 
   def __init__(self, scope, args, body):
     self.scope = scope
@@ -439,14 +463,23 @@ class Function(Object):
     for name, arg in zip(self.args, args):
       scope.Declare(name)
       scope[name] = arg
+    return Evaluate(scope, self.body)
 
-    try:
-      return Evaluate(scope, self.body)
-    except ReturnException as e:
-      return e.value
-    except CclError as e:
-      e.trace.append(self.body.origin)
-      raise
+  def XXBool(self):
+    return true
+
+
+class BuiltinFunction(Object):
+
+  def __init__(self, f):
+    self.f = f
+
+  def __call__(self, *args):
+    result = self.f(*args)
+    return nil if result is None else result
+
+  def XXBool(self):
+    return true
 
 
 class Scope(object):
@@ -457,6 +490,9 @@ class Scope(object):
 
   def Declare(self, key, value=None):
     self.table[key] = nil if value is None else value
+
+  def DeclareBuiltin(self, f):
+    self.table[f.__name__] = BuiltinFunction(f)
 
   def __getitem__(self, key):
     if key in self.table:
@@ -481,16 +517,27 @@ ROOT_SCOPE.Declare('true', true)
 ROOT_SCOPE.Declare('false', false)
 
 
+@ROOT_SCOPE.DeclareBuiltin
+def Assert(cond, message=''):
+  if not cond:
+    raise AssertError('Assertion error: ' + str(message))
+
+
+@ROOT_SCOPE.DeclareBuiltin
+def Create():
+  return Object()
+
+
 class CclError(Exception):
 
-  def __init__(self, message, origin):
-    print(origin)
+  def __init__(self, message):
     super(CclError, self).__init__(message + '\n' + origin.LocationMessage())
     self.message = message
-    self.trace = [origin]
+    self.trace = []
 
   def __str__(self):
     return self.message + '\n' + ''.join(origin.LocationMessage() for origin in self.trace)
+
 
 class BreakException(Exception):
   pass
@@ -502,99 +549,123 @@ class ReturnException(Exception):
     self.value = value
 
 
+class AssertError(CclError):
+  pass
+
+
 def Evaluate(scope, node):
 
-  if node.type == 'Module':
-    last = nil
-    for child in node.children:
-      last = Evaluate(scope, child)
-    return last
-  elif node.type == 'Name':
-    try:
-      return scope[node.value]
-    except KeyError as e:
-      raise CclError('%s is not defined' % str(e), node.origin)
-  elif node.type == 'String':
-    return String(node.value)
-  elif node.type == 'Number':
-    return Number(node.value)
-  elif node.type == 'List':
-    return List([Evaluate(scope, n) for n in node.children])
-  elif node.type == 'Function':
-    return Function(scope, node.value, node.children[0])
-  elif node.type == 'Block':
-    last = nil
-    for child in node.children:
-      last = Evaluate(scope, child)
-    return last
-  elif node.type == 'break':
-    raise BreakException()
-  elif node.type == 'var':
-    for name in node.value:
-      scope.Declare(name)
-    return nil
-  elif node.type == 'if':
-    if Evaluate(scope, node.children[0]):
-      return Evaluate(scope, node.children[1])
-    elif len(node.children) == 2:
-      return nil
-    else:
-      return Evaluate(scope, node.children[2])
-  elif node.type == 'while':
-    last = nil
-    while Evaluate(scope, node.children[0]):
-      last = Evaluate(scope, node.children[1])
-    return last
-  elif node.type == 'return':
-    raise ReturnException(Evaluate(scope, node.children[0]))
-  elif node.type == 'Call':
-    return Evaluate(scope, node.children[0])(*Evaluate(scope, node.children[1]))
-  elif node.type == 'Arguments':
-    return [Evaluate(scope, n) for n in node.children]
-  elif node.type == 'GetAttribute':
-    value, = node.children
-    owner = Evaluate(scope, value)
-    attr = 'XX' + node.value
-    try:
-      return getattr(owner, attr)
-    except AttributeError:
-      raise CclError('Object has no attribute ' + node.value, node.origin)
-  elif node.type == 'SetAttribute':
-    lhs, rhs = [Evaluate(scope, n) for n in node.children]
-    return setattr(lhs, node.value, 'XX' + rhs)
-  elif node.type == 'and':
-    lhs, rhs = node.children
-    lhs = Evaluate(scope, lhs)
-    if lhs:
-      return Evaluate(scope, rhs)
-    else:
-      return lhs
-  elif node.type == 'or':
-    lhs, rhs = node.children
-    lhs = Evaluate(scope, lhs)
-    if lhs:
-      return lhs
-    else:
-      return Evaluate(scope, rhs)
-  elif node.type == 'Assign':
-    name = node.value
-    value = Evaluate(scope, node.children[0])
-    try:
-      scope[name] = value
-    except KeyError as e:
-      raise CclError('%s is not defined' % str(e), node.origin)
-    return value
+  if not isinstance(node.origin, Origin):
+    raise TypeError((node.type, node.origin))
 
-  raise CclError('Unrecognized node ' + node.type, node.origin)
+  try:
+    if node.type == 'Module':
+      last = nil
+      for child in node.children:
+        last = Evaluate(scope, child)
+      return last
+    elif node.type == 'Name':
+      try:
+        return scope[node.value]
+      except KeyError as e:
+        raise CclError('%s is not defined' % str(e))
+    elif node.type == 'String':
+      return String(node.value)
+    elif node.type == 'Number':
+      return Number(node.value)
+    elif node.type == 'List':
+      return List([Evaluate(scope, n) for n in node.children])
+    elif node.type == 'Function':
+      return UserFunction(scope, node.value, node.children[0])
+    elif node.type == 'Block':
+      last = nil
+      for child in node.children:
+        last = Evaluate(scope, child)
+      return last
+    elif node.type == 'break':
+      raise BreakException()
+    elif node.type == 'var':
+      for name in node.value:
+        scope.Declare(name)
+      return nil
+    elif node.type == 'if':
+      if Evaluate(scope, node.children[0]):
+        return Evaluate(scope, node.children[1])
+      elif len(node.children) == 2:
+        return nil
+      else:
+        return Evaluate(scope, node.children[2])
+    elif node.type == 'while':
+      last = nil
+      while Evaluate(scope, node.children[0]):
+        last = Evaluate(scope, node.children[1])
+      return last
+    elif node.type == 'return':
+      raise ReturnException(Evaluate(scope, node.children[0]))
+    elif node.type == 'Call':
+      f = Evaluate(scope, node.children[0])
+      args = Evaluate(scope, node.children[1])
+      try:
+        return f(*args)
+      except ReturnException as e:
+        return e.value
+      except CclError as e:
+        e.trace.append(node.origin)
+        raise
+    elif node.type == 'Arguments':
+      return [Evaluate(scope, n) for n in node.children]
+    elif node.type == 'GetAttribute':
+      value, = node.children
+      owner = Evaluate(scope, value)
+      attr = 'XX' + node.value
+      try:
+        return getattr(owner, attr)
+      except AttributeError:
+        raise CclError('Object has no attribute ' + node.value)
+    elif node.type == 'SetAttribute':
+      lhs, rhs = [Evaluate(scope, n) for n in node.children]
+      return setattr(lhs, node.value, 'XX' + rhs)
+    elif node.type == 'and':
+      lhs, rhs = node.children
+      lhs = Evaluate(scope, lhs)
+      if lhs:
+        return Evaluate(scope, rhs)
+      else:
+        return lhs
+    elif node.type == 'or':
+      lhs, rhs = node.children
+      lhs = Evaluate(scope, lhs)
+      if lhs:
+        return lhs
+      else:
+        return Evaluate(scope, rhs)
+    elif node.type == 'Assign':
+      name = node.value
+      value = Evaluate(scope, node.children[0])
+      try:
+        scope[name] = value
+      except KeyError as e:
+        raise CclError('%s is not defined' % str(e))
+      return value
+
+    raise CclError('Unrecognized node ' + node.type)
+  except CclError as e:
+    if not e.trace:
+      e.trace.append(node.origin)
+    raise
 
 
 def Run(string, filename=None):
-  filename = filename or '<unknown>'
+  return Evaluate(ROOT_SCOPE, Parse(string, filename or '<unknown>'))
+
+
+def QuickRun(string, filename=None):
   try:
-    return Evaluate(ROOT_SCOPE, Parse(string, filename))
+    return Run(string, filename)
   except CclError as e:
     sys.stderr.write('***** Error *****\n' + str(e))
     exit(1)
+
 
 ### Test
 
@@ -745,15 +816,16 @@ in <test> on line 1 column 1
 else:
   assert False, "Parse('=', '<test>') should have raised error but didn't"
 
+try:
+  Run("Assert(false)")
+except AssertError as e:
+  pass
+else:
+  assert False, "Assert(false) should have raised error but didn't"
+
 
 Run(r"""
-var x
 
-"hi".Print()
+Assert("a".Equal("a"))
 
-x.Print()
-
-f = \ . Create()
-
-""", '<test>')
-
+""")
