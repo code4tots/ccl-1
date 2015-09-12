@@ -1,4 +1,5 @@
 
+
 var Origin = \ filename string position
   var self = Create()
   self.filename = filename
@@ -21,7 +22,7 @@ var Origin = \ filename string position
     return self.position.Subtract(self.LineStart()).Add(1)
 
   self.Line = \
-    return self.String.Slice(self.LineStart(), self.LineEnd())
+    return self.string.Slice(self.LineStart(), self.LineEnd())
 
   self.LineStart = \
     var i = self.position
@@ -31,7 +32,7 @@ var Origin = \ filename string position
 
   self.LineEnd = \
     var i = self.position
-    while i.LessThan(self.Size()) and self.string.Get(i).NotEqual('\n')
+    while i.LessThan(self.string.Size()) and self.string.Get(i).NotEqual('\n')
       i = i.Add(1)
     return i
 
@@ -47,11 +48,43 @@ var Token = \ type value origin
   self.Equal = \ other
     return self.type.Equal(other.type) and self.value.Equal(other.value)
 
+  self.Inspect = \
+    return 'Token(%r,%r)'.Format([self.type, self.value])
+
+  return self
+
+
+var SYMBOLS = [
+    '\\', '.',
+    '(', ')', '[', ']',
+    '=',
+    ';', ',',
+]
+
+var KEYWORDS = [
+    'while', 'break',
+    'if', 'else',
+    'and', 'or',
+    'return',
+    'var',
+]
+
+
+var LexError = \ message origin
+  self = Create()
+  self.String = \ . message.Add('\n').Add(origin.LocationMessage())
   return self
 
 
 # Tests
 
 var origin = Origin('<test>', r"""
+hello world!
 """, 1)
 
+Assert(origin.Line().Equal('hello world!'), origin.Line())
+
+Assert(origin.LocationMessage().Equal("""in <test> on line 2 column 1
+hello world!
+*
+"""), origin.LocationMessage())

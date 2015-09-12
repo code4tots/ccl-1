@@ -331,34 +331,37 @@ def Parse(string, filename):
   def PostfixExpression():
     expr = PrimaryExpression()
     while True:
-      if Consume('('):
+      origin = [None]
+      if Consume('(', origin):
         args = []
         while not Consume(')'):
           args.append(Expression())
           Consume(',')
         if At('\\'):
           args.append(PrimaryExpression())
-        expr = Node('Call', None, [expr, Node('Arguments', None, args, expr.origin)], expr.origin)
-      elif Consume('.'):
+        expr = Node('Call', None, [expr, Node('Arguments', None, args, expr.origin)], origin[0])
+      elif Consume('.', origin):
         name = Expect('Name').value
         if Consume('='):
-          expr = Node('SetAttribute', name, [expr, Expression()], expr.origin)
+          expr = Node('SetAttribute', name, [expr, Expression()], origin[0])
         else:
-          expr = Node('GetAttribute', name, [expr], expr.origin)
+          expr = Node('GetAttribute', name, [expr], origin[0])
       else:
         break
     return expr
 
   def AndExpression():
     expr = PostfixExpression()
-    while Consume('and'):
-      expr = Node('and', None, [expr, AndExpression()])
+    origin = [None]
+    while Consume('and', origin):
+      expr = Node('and', None, [expr, AndExpression()], origin[0])
     return expr
 
   def OrExpression():
     expr = AndExpression()
-    while Consume('or'):
-      expr = Node('or', None, [expr, OrExpression()])
+    origin = [None]
+    while Consume('or', origin):
+      expr = Node('or', None, [expr, OrExpression()], origin[0])
     return expr
 
   def AssignExpression():
@@ -385,10 +388,25 @@ class Object(object):
     return self
 
   def XXString(self):
+    return self.XXInspect()
+
+  def XXInspect(self):
     return String('<Object %d>' % id(self))
 
   def XXEqual(self, other):
     return Bool(id(self) == id(other))
+
+  def XXLessThanOrEqual(self, other):
+    return self.XXLessThan(other) or self.XXEqual(other)
+
+  def XXGreaterThan(self, other):
+    return not self.XXLessThanOrEqual(other)
+
+  def XXGreaterThanOrEqual(self, other):
+    return not self.XXLessThan(other)
+
+  def XXNotEqual(self, other):
+    return not self.XXEqual(other)
 
   def __eq__(self, other):
     return self.XXEqual(other)
@@ -401,6 +419,9 @@ class Object(object):
 
   def __str__(self):
     return self.XXString().value
+
+  def __repr__(self):
+    return self.XXInspect().value
 
 class Nil(Object):
 
@@ -450,6 +471,11 @@ class Number(WrapedObject):
       return Number(self.value + other.value)
     raise Exception((other.type, other))
 
+  def XXSubtract(self, other):
+    if isinstance(other, Number):
+      return Number(self.value - other.value)
+    raise Exception((other.type, other))
+
   def XXLessThan(self, other):
     if not isinstance(other, Number):
       raise CclError('Can only Number.LessThan with other numbers')
@@ -467,6 +493,23 @@ class String(WrapedObject):
   def XXString(self):
     return self
 
+  def XXSize(self):
+    return len(self.value)
+
+  def XXSlice(self, lower, upper):
+    return self.value[lower.value:upper.value]
+
+  def XXGet(self, i):
+    return self.value[i.value]
+
+  def XXFormat(self, args):
+    return self.value % tuple(RevertValue(args))
+
+  def XXCount(self, item, lower=None, upper=None):
+    return self.value.count(item.value, lower.value, upper.value)
+
+  def XXMultiply(self, n):
+    return self.value * n.value
 
 class List(WrapedObject):
 
@@ -573,6 +616,17 @@ class ReturnException(Exception):
 
 class AssertError(CclError):
   pass
+
+
+def RevertValue(x):
+  if not isinstance(x, Object):
+    return x
+  elif isinstance(x, (Bool, Number, String)):
+    return x.value
+  elif isinstance(x, List):
+    return list(map(RevertValue, x.value))
+  else:
+    raise TypeError("Value is not convertible: %s" % type(x))
 
 
 def ConvertValue(value):
