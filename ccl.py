@@ -296,7 +296,7 @@ def Parse(string, filename):
         EatExpressionDelimiters()
       return Node('Block', None, exprs, origin[0])
     elif Consume('break', origin):
-      return Node('break', origin[0])
+      return Node('break', None, [], origin[0])
     elif Consume('var', origin):
       names = []
       values = []
@@ -396,13 +396,13 @@ class Object(object):
   def XXEqual(self, other):
     return Bool(id(self) == id(other))
 
-  def XXLessThanOrEqual(self, other):
+  def XXLessThanOrEqualTo(self, other):
     return self.XXLessThan(other) or self.XXEqual(other)
 
   def XXGreaterThan(self, other):
-    return not self.XXLessThanOrEqual(other)
+    return not self.XXLessThanOrEqualTo(other)
 
-  def XXGreaterThanOrEqual(self, other):
+  def XXGreaterThanOrEqualTo(self, other):
     return not self.XXLessThan(other)
 
   def XXNotEqual(self, other):
@@ -691,8 +691,11 @@ def Evaluate(scope, node):
         return Evaluate(scope, node.children[2])
     elif node.type == 'while':
       last = nil
-      while Evaluate(scope, node.children[0]):
-        last = Evaluate(scope, node.children[1])
+      try:
+        while Evaluate(scope, node.children[0]):
+          last = Evaluate(scope, node.children[1])
+      except BreakException:
+        pass
       return last
     elif node.type == 'return':
       raise ReturnException(Evaluate(scope, node.children[0]))

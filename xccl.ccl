@@ -26,7 +26,7 @@ var Origin = \ filename string position
 
   self.LineStart = \
     var i = self.position
-    while i.GreaterThanOrEqual(0) and self.string.Get(i).NotEqual('\n')
+    while i.GreaterThanOrEqualTo(0) and self.string.Get(i).NotEqual('\n')
       i = i.Subtract(1)
     return i.Add(1)
 
@@ -76,7 +76,39 @@ var LexError = \ message origin
   return self
 
 
-# Tests
+var Lex = \ string filename
+  var tokens = []
+  var depth = 0
+  var s = string
+  var i = 0
+  var j = 0
+  var indent_stack = ['']
+
+  var MakeOrigin = \ . Origin(filename, s, j)
+
+  var MakeToken = \ type value . Token(type, value, MakeOrigin())
+
+  while true
+    while i.LessThan(s.Size()) and (s.Get(i).Equal('#') or (s.Get(i).IsSpace() and (depth or s.Get(i).NotEqual('\n'))))
+      if s.Get(i).Equal('#')
+        while i.LessThan(s.Size()) and s.Get(i).NotEqual('\n')
+          i = i.Add(1)
+        else
+          i = i.Add(1)
+
+    j = i
+
+    if i.GreaterThanOrEqualTo(s.Size())
+      break
+
+    if s.Get(i).Equal('\n')
+      i = i.Add(1)
+      tokens.Push(MakeToken())
+
+  "outside while loop".Print()
+
+
+### Tests
 
 var origin = Origin('<test>', r"""
 hello world!
@@ -88,3 +120,7 @@ Assert(origin.LocationMessage().Equal("""in <test> on line 2 column 1
 hello world!
 *
 """), origin.LocationMessage())
+
+Lex(r"""
+""",
+'<test>')
