@@ -168,6 +168,14 @@ class Scope(object):
   def Declare(self, key, value=None):
     self.table[key] = nil if value is None else value
 
+  def DeclareForm(self, form):
+    self.table[form.__name__] = Form(form)
+    return form
+
+  def DeclareFunction(self, function):
+    self.table[function.__name__] = Function(function)
+    return function
+
   def Get(self, key):
     if key in self.table:
       return self.table[key]
@@ -185,21 +193,155 @@ class Scope(object):
       raise KeyError(key)
 
 
+class Object(object):
+  pass
+
+
+class Nil(Object):
+
+  def __init__(self):
+    self.metatable = NIL_METATABLE
+
+
+class Bool(Object):
+
+  def __init__(self, value):
+    self.value = value
+    self.metatable = BOOL_METATABLE
+
+
+class Number(Object):
+
+  def __init__(self, value):
+    self.value = value
+    self.metatable = NUMBER_METATABLE
+
+
+class String(Object):
+
+  def __init__(self, value):
+    self.value = value
+    self.metatable = STRING_METATABLE
+
+
+class Table(Object):
+
+  def __init__(self):
+    self.table = dict()
+    self.parent = None
+    self.metatable = TABLE_METATABLE
+
+  def DeclareMethod(self, name):
+    def wrapper(method):
+      assert isinstance(method, Form), type(method)
+      self.table[name] = method
+    return wrapper
+
+  def Lookup(self, name):
+    if name in self.table:
+      return self.table[name]
+    elif self.parent:
+      return self.parent.Lookup(name)
+    else:
+      raise KeyError(name)
+
+
+class Form(Object):
+
+  def __init__(self, f):
+    self.Apply = f
+    self.metatable = FORM_METATABLE
+
+
+class Function(Form):
+
+  def __init__(self, f):
+    self.f = f
+    self.metatable = FORM_METATABLE
+
+  def Apply(self, scope, origin, argexprs):
+    args = [Eval(scope, argexpr) for argexpr in argexprs]
+    scope.stack.append(origin)
+    try:
+      return self.f(*args)
+    finally:
+      scope.stack.pop()
+
+
 def Eval(scope, node):
   if node.type == 'Module':
-    last = None
+    last = nil
     for expr in node.value:
       last = Eval(scope, expr)
     return last
   elif node.type == 'Form':
-    fexpr, argexprs = call.value
-    f = Eval(scope, fexpr)
-    return f.Apply(scope, node.origin, argexprs)
+    fexpr, argexprs = node.value
+    return Eval(scope, fexpr).Apply(scope, node.origin, argexprs)
   elif node.type == 'Name':
     return scope.Get(node.value)
-  elif node.type in ('Number', 'String'):
-    return node.value
+  elif node.type == 'Number':
+    return Number(node.value)
+  elif node.type == 'String':
+    return String(node.value)
   else:
     raise ValueError('Unexpected node type: ' + node.type)
 
+
+ROOT_SCOPE = Scope()
+
+TABLE_METATABLE = None
+TABLE_METATABLE = Table()
+TABLE_METATABLE.metatable = TABLE_METATABLE
+
+NIL_METATABLE = Table()
+BOOL_METATABLE = Table()
+NUMBER_METATABLE = Table()
+STRING_METATABLE = Table()
+FORM_METATABLE = Table()
+
+nil = Nil()
+
+@STRING_METATABLE.DeclareMethod('Print')
+@Function
+def _(owner):
+  result = GetMetatable(owner)['String'](owner)
+  assert type(result) == String
+  print(result.value)
+  return result
+
+
+@STRING_METATABLE.DeclareMethod('String')
+@Function
+def _(owner):
+  return Function(lambda: owner)
+
+
+@ROOT_SCOPE.DeclareForm
+def While(scope, origin, argexprs):
+  test, body = argexprs
+  last = None
+  while Eval(scope, test):
+    last = Eval(scope, body)
+  return last
+
+
+@ROOT_SCOPE.DeclareFunction
+def GetMetatable(owner):
+  return owner.metatable
+
+
+@ROOT_SCOPE.DeclareFunction
+def Get(owner, attribute):
+  assert type(attribute) == String, type(attribute)
+  method = GetMetatable(owner).Lookup(attribute.value)
+
+
+def Run(string, filename):
+  return Eval(ROOT_SCOPE, Parse(string, filename))
+
+Run(r"""
+
+((Get 'hi' 'Print'))
+
+""", '<test>')
 
